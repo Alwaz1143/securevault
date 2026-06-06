@@ -1,32 +1,54 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client"
+  output   = "../generated/prisma"
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider = "postgresql"
+}
+
+model User {
+  id          String   @id @default(cuid())
+  clerkUserId String   @unique
+  email       String?
+  kdfSalt     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  vaultItems VaultItem[]
+  auditLogs  AuditLog[]
 }
 
 model VaultItem {
-  id          String   @id @default(cuid())
-  title       String
-  username    String?
-  password    String   // stored encrypted
-  url         String?
-  notes       String?
-  category    String   @default("login")
-  userId      String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String   @id @default(cuid())
+  userId        String
+  encryptedData String   @db.Text
+  iv            String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model AuditLog {
-  id        String   @id @default(cuid())
-  action    String
+  id        String      @id @default(cuid())
   userId    String
-  metadata  String?
-  createdAt DateTime @default(now())
+  action    AuditAction
+  metadata  Json?
+  createdAt DateTime    @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+enum AuditAction {
+  VAULT_UNLOCKED
+  VAULT_LOCKED
+  VAULT_ITEM_CREATED
+  VAULT_ITEM_UPDATED
+  VAULT_ITEM_DELETED
+  BREACH_CHECK_PERFORMED
 }

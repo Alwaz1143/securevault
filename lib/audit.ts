@@ -1,24 +1,29 @@
 import prisma from "./prisma";
 
 export type AuditAction =
+  | "VAULT_UNLOCKED"
+  | "VAULT_LOCKED"
   | "VAULT_ITEM_CREATED"
-  | "VAULT_ITEM_VIEWED"
   | "VAULT_ITEM_UPDATED"
   | "VAULT_ITEM_DELETED"
-  | "PASSWORD_GENERATED"
-  | "BREACH_CHECK_PERFORMED"
-  | "SETTINGS_UPDATED";
+  | "BREACH_CHECK_PERFORMED";
 
-export async function createAuditLog(params: {
+type CreateAuditLogInput = {
+  userId: string;
   action: AuditAction;
-  userId?: string;
-  metadata?: Record<string, unknown>;
-}) {
+  metadata?: Record<string, string | number | boolean | null>;
+};
+
+export async function createAuditLog({
+  userId,
+  action,
+  metadata,
+}: CreateAuditLogInput) {
   return prisma.auditLog.create({
     data: {
-      action: params.action,
-      userId: params.userId ?? "anonymous",
-      metadata: params.metadata ? JSON.stringify(params.metadata) : null,
+      userId,
+      action,
+      metadata: metadata ?? undefined,
     },
   });
 }

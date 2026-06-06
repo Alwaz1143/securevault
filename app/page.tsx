@@ -1,7 +1,47 @@
+import Link from "next/link";
+import {
+  Show,
+  SignInButton,
+  SignUpButton,
+  UserButton,
+} from "@clerk/nextjs";
+
 export default function Home() {
   return (
     <main className="min-h-screen bg-slate-950 text-white">
-      <section className="mx-auto flex min-h-screen max-w-6xl flex-col items-center justify-center px-6 text-center">
+      <nav className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
+        <Link href="/" className="text-xl font-bold text-cyan-300">
+          SecureVault
+        </Link>
+
+        <div className="flex items-center gap-4">
+          <Show when="signed-out">
+            <SignInButton mode="modal">
+              <button className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-cyan-400 hover:text-cyan-300">
+                Login
+              </button>
+            </SignInButton>
+
+            <SignUpButton mode="modal">
+              <button className="rounded-xl bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300">
+                Sign Up
+              </button>
+            </SignUpButton>
+          </Show>
+
+          <Show when="signed-in">
+            <Link
+              href="/dashboard"
+              className="rounded-xl bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
+            >
+              Dashboard
+            </Link>
+            <UserButton />
+          </Show>
+        </div>
+      </nav>
+
+      <section className="mx-auto flex max-w-6xl flex-col items-center justify-center px-6 py-24 text-center">
         <div className="mb-4 rounded-full border border-cyan-500/30 bg-cyan-500/10 px-4 py-2 text-sm text-cyan-300">
           Secure Password Manager
         </div>
@@ -20,18 +60,35 @@ export default function Home() {
         </p>
 
         <div className="mt-8 flex flex-col gap-4 sm:flex-row">
-          <button className="rounded-xl bg-cyan-400 px-6 py-3 font-semibold text-slate-950 transition hover:bg-cyan-300">
-            Login
-          </button>
+          <Show when="signed-out">
+            <SignInButton mode="modal">
+              <button className="rounded-xl bg-cyan-400 px-6 py-3 font-semibold text-slate-950 transition hover:bg-cyan-300">
+                Login
+              </button>
+            </SignInButton>
 
-          <button className="rounded-xl border border-slate-700 px-6 py-3 font-semibold text-slate-200 transition hover:border-cyan-400 hover:text-cyan-300">
-            Sign Up
-          </button>
+            <SignUpButton mode="modal">
+              <button className="rounded-xl border border-slate-700 px-6 py-3 font-semibold text-slate-200 transition hover:border-cyan-400 hover:text-cyan-300">
+                Sign Up
+              </button>
+            </SignUpButton>
+          </Show>
+
+          <Show when="signed-in">
+            <Link
+              href="/dashboard"
+              className="rounded-xl bg-cyan-400 px-6 py-3 font-semibold text-slate-950 transition hover:bg-cyan-300"
+            >
+              Go to Dashboard
+            </Link>
+          </Show>
         </div>
 
         <div className="mt-12 grid max-w-4xl gap-4 sm:grid-cols-3">
           <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
-            <h2 className="font-semibold text-slate-100">Client-Side Encryption</h2>
+            <h2 className="font-semibold text-slate-100">
+              Client-Side Encryption
+            </h2>
             <p className="mt-2 text-sm text-slate-400">
               Vault data is encrypted in the browser before reaching the server.
             </p>
@@ -40,12 +97,15 @@ export default function Home() {
           <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
             <h2 className="font-semibold text-slate-100">Master Password</h2>
             <p className="mt-2 text-sm text-slate-400">
-              The master password is used to unlock the vault, not for app login.
+              The master password is used to unlock the vault, not for app
+              login.
             </p>
           </div>
 
           <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
-            <h2 className="font-semibold text-slate-100">Encrypted Storage</h2>
+            <h2 className="font-semibold text-slate-100">
+              Encrypted Storage
+            </h2>
             <p className="mt-2 text-sm text-slate-400">
               The database stores ciphertext, IV, salt, and metadata only.
             </p>

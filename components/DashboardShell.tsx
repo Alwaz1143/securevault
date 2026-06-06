@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { UserButton } from "@clerk/nextjs";
 
 type DashboardShellProps = {
   children: React.ReactNode;
@@ -84,12 +85,25 @@ export default function DashboardShell({
 
         <section className="flex-1">
           <header className="border-b border-slate-800 bg-slate-950/80 p-6">
-            <div className="mx-auto max-w-6xl">
-              <p className="text-sm text-cyan-300">SecureVault MVP</p>
-              <h2 className="mt-2 text-3xl font-bold">{title}</h2>
-              <p className="mt-2 max-w-2xl text-sm text-slate-400">
-                {description}
-              </p>
+            <div className="mx-auto flex max-w-6xl items-start justify-between gap-6">
+              <div>
+                <p className="text-sm text-cyan-300">SecureVault MVP</p>
+                <h2 className="mt-2 text-3xl font-bold">{title}</h2>
+                <p className="mt-2 max-w-2xl text-sm text-slate-400">
+                  {description}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <Link
+                  href="/"
+                  className="hidden rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-300 transition hover:border-cyan-400 hover:text-cyan-300 sm:block"
+                >
+                  Home
+                </Link>
+
+                <UserButton />
+              </div>
             </div>
           </header>
 

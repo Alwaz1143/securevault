@@ -17,6 +17,8 @@ model User {
 
   vaultItems VaultItem[]
   auditLogs  AuditLog[]
+  masterKeyVerifier   String?
+  masterKeyVerifierIv String?
 }
 
 model VaultItem {

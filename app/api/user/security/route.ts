@@ -19,6 +19,8 @@ export async function GET() {
     return NextResponse.json({
       ok: true,
       kdfSalt: user.kdfSalt,
+      masterKeyVerifier: user.masterKeyVerifier,
+      masterKeyVerifierIv: user.masterKeyVerifierIv,
     });
   } catch (error) {
     console.error("Failed to fetch user security settings:", error);

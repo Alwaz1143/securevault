@@ -7,11 +7,24 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { deriveVaultKey, generateSaltBase64 } from "@/lib/crypto";
+import {
+  decryptVaultData,
+  deriveVaultKey,
+  encryptVaultData,
+  generateSaltBase64,
+} from "@/lib/crypto";
+
+const MASTER_KEY_VERIFIER_TEXT = "SECUREVAULT_MASTER_KEY_VERIFIER_V1";
 
 type UnlockResult = {
   ok: boolean;
   message?: string;
+};
+
+type SecuritySettings = {
+  kdfSalt: string | null;
+  masterKeyVerifier: string | null;
+  masterKeyVerifierIv: string | null;
 };
 
 type VaultContextValue = {
@@ -25,25 +38,29 @@ type VaultContextValue = {
 
 const VaultContext = createContext<VaultContextValue | undefined>(undefined);
 
-async function getOrCreateKdfSalt() {
-  const getResponse = await fetch("/api/user/security", {
+async function fetchSecuritySettings(): Promise<SecuritySettings> {
+  const response = await fetch("/api/user/security", {
     method: "GET",
     cache: "no-store",
   });
 
-  const getData = await getResponse.json();
+  const data = await response.json();
 
-  if (!getResponse.ok || !getData.ok) {
-    throw new Error(getData.message || "Failed to fetch KDF salt");
+  if (!response.ok || !data.ok) {
+    throw new Error(data.message || "Failed to fetch security settings");
   }
 
-  if (getData.kdfSalt) {
-    return getData.kdfSalt as string;
-  }
+  return {
+    kdfSalt: data.kdfSalt ?? null,
+    masterKeyVerifier: data.masterKeyVerifier ?? null,
+    masterKeyVerifierIv: data.masterKeyVerifierIv ?? null,
+  };
+}
 
+async function createKdfSalt() {
   const newSalt = generateSaltBase64();
 
-  const postResponse = await fetch("/api/user/security", {
+  const response = await fetch("/api/user/security", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -53,13 +70,35 @@ async function getOrCreateKdfSalt() {
     }),
   });
 
-  const postData = await postResponse.json();
+  const data = await response.json();
 
-  if (!postResponse.ok || !postData.ok) {
-    throw new Error(postData.message || "Failed to save KDF salt");
+  if (!response.ok || !data.ok) {
+    throw new Error(data.message || "Failed to save KDF salt");
   }
 
-  return postData.kdfSalt as string;
+  return data.kdfSalt as string;
+}
+
+async function saveMasterKeyVerifier(
+  masterKeyVerifier: string,
+  masterKeyVerifierIv: string
+) {
+  const response = await fetch("/api/user/security/verifier", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      masterKeyVerifier,
+      masterKeyVerifierIv,
+    }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || !data.ok) {
+    throw new Error(data.message || "Failed to save master key verifier");
+  }
 }
 
 export function VaultProvider({ children }: { children: ReactNode }) {
@@ -79,8 +118,46 @@ export function VaultProvider({ children }: { children: ReactNode }) {
         };
       }
 
-      const kdfSalt = await getOrCreateKdfSalt();
+      const securitySettings = await fetchSecuritySettings();
+
+      const kdfSalt = securitySettings.kdfSalt ?? (await createKdfSalt());
+
       const derivedKey = await deriveVaultKey(masterPassword, kdfSalt);
+
+      if (
+        securitySettings.masterKeyVerifier &&
+        securitySettings.masterKeyVerifierIv
+      ) {
+        try {
+          const verifierText = await decryptVaultData<string>(
+            securitySettings.masterKeyVerifier,
+            securitySettings.masterKeyVerifierIv,
+            derivedKey
+          );
+
+          if (verifierText !== MASTER_KEY_VERIFIER_TEXT) {
+            return {
+              ok: false,
+              message: "Incorrect master password.",
+            };
+          }
+        } catch {
+          return {
+            ok: false,
+            message: "Incorrect master password.",
+          };
+        }
+      } else {
+        const encryptedVerifier = await encryptVaultData(
+          MASTER_KEY_VERIFIER_TEXT,
+          derivedKey
+        );
+
+        await saveMasterKeyVerifier(
+          encryptedVerifier.encryptedData,
+          encryptedVerifier.iv
+        );
+      }
 
       setVaultKey(derivedKey);
       setIsVaultUnlocked(true);
@@ -102,11 +179,6 @@ export function VaultProvider({ children }: { children: ReactNode }) {
   }
 
   function lockVault() {
-    /*
-      This removes the CryptoKey from React state.
-      It does not guarantee perfect memory wiping, but practically the app
-      no longer has access to the key after locking.
-    */
     setVaultKey(null);
     setIsVaultUnlocked(false);
     setUnlockedAt(null);

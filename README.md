@@ -1,4 +1,3 @@
-````md
 # SecureVault — Encrypted Password Manager
 
 SecureVault is a full-stack encrypted password manager designed with a zero-knowledge-inspired approach using client-side encryption.

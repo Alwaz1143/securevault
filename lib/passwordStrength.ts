@@ -1,38 +1,141 @@
-export type StrengthLevel = "Very Weak" | "Weak" | "Fair" | "Strong" | "Very Strong";
+export type PasswordStrengthLabel = "Weak" | "Medium" | "Strong" | "Very Strong";
 
-export interface PasswordStrengthResult {
-  score: number; // 0–100
-  level: StrengthLevel;
-  suggestions: string[];
+export type PasswordStrengthResult = {
+  score: number;
+  label: PasswordStrengthLabel;
+  percentage: number;
+  feedback: string[];
+};
+
+const COMMON_PATTERNS = [
+  "password",
+  "qwerty",
+  "admin",
+  "welcome",
+  "letmein",
+  "iloveyou",
+  "123456",
+  "000000",
+];
+
+function hasRepeatedCharacters(password: string) {
+  return /(.)\1{2,}/.test(password);
 }
 
-export function checkPasswordStrength(password: string): PasswordStrengthResult {
+function hasSequentialPattern(password: string) {
+  const lower = password.toLowerCase();
+
+  const sequences = [
+    "abcdefghijklmnopqrstuvwxyz",
+    "0123456789",
+    "qwertyuiop",
+    "asdfghjkl",
+    "zxcvbnm",
+  ];
+
+  return sequences.some((sequence) => {
+    for (let i = 0; i <= sequence.length - 4; i++) {
+      const part = sequence.slice(i, i + 4);
+
+      if (lower.includes(part)) {
+        return true;
+      }
+    }
+
+    return false;
+  });
+}
+
+export function evaluatePasswordStrength(
+  password: string
+): PasswordStrengthResult {
+  const feedback: string[] = [];
   let score = 0;
-  const suggestions: string[] = [];
 
-  if (password.length >= 8) score += 20;
-  else suggestions.push("Use at least 8 characters.");
+  if (!password) {
+    return {
+      score: 0,
+      label: "Weak",
+      percentage: 0,
+      feedback: ["Enter a password to check its strength."],
+    };
+  }
 
-  if (password.length >= 16) score += 10;
+  if (password.length >= 8) {
+    score += 1;
+  } else {
+    feedback.push("Use at least 8 characters.");
+  }
 
-  if (/[A-Z]/.test(password)) score += 20;
-  else suggestions.push("Add uppercase letters.");
+  if (password.length >= 12) {
+    score += 1;
+  } else {
+    feedback.push("12+ characters is better.");
+  }
 
-  if (/[a-z]/.test(password)) score += 10;
-  else suggestions.push("Add lowercase letters.");
+  if (password.length >= 16) {
+    score += 1;
+  }
 
-  if (/[0-9]/.test(password)) score += 20;
-  else suggestions.push("Add numbers.");
+  const hasLowercase = /[a-z]/.test(password);
+  const hasUppercase = /[A-Z]/.test(password);
+  const hasNumber = /\d/.test(password);
+  const hasSymbol = /[^A-Za-z0-9]/.test(password);
 
-  if (/[^A-Za-z0-9]/.test(password)) score += 20;
-  else suggestions.push("Add special characters.");
+  const varietyCount = [
+    hasLowercase,
+    hasUppercase,
+    hasNumber,
+    hasSymbol,
+  ].filter(Boolean).length;
 
-  const level: StrengthLevel =
-    score >= 90 ? "Very Strong" :
-    score >= 70 ? "Strong" :
-    score >= 50 ? "Fair" :
-    score >= 30 ? "Weak" :
-    "Very Weak";
+  if (varietyCount >= 3) {
+    score += 1;
+  } else {
+    feedback.push("Use a mix of uppercase, lowercase, numbers, and symbols.");
+  }
 
-  return { score, level, suggestions };
+  if (varietyCount === 4) {
+    score += 1;
+  }
+
+  const lowerPassword = password.toLowerCase();
+
+  if (COMMON_PATTERNS.some((pattern) => lowerPassword.includes(pattern))) {
+    score -= 2;
+    feedback.push("Avoid common words or leaked-style patterns.");
+  }
+
+  if (hasRepeatedCharacters(password)) {
+    score -= 1;
+    feedback.push("Avoid repeated characters like aaa or 111.");
+  }
+
+  if (hasSequentialPattern(password)) {
+    score -= 1;
+    feedback.push("Avoid keyboard or number sequences like qwerty or 1234.");
+  }
+
+  score = Math.max(0, Math.min(score, 5));
+
+  let label: PasswordStrengthLabel = "Weak";
+
+  if (score >= 5) {
+    label = "Very Strong";
+  } else if (score >= 4) {
+    label = "Strong";
+  } else if (score >= 2) {
+    label = "Medium";
+  }
+
+  if (feedback.length === 0) {
+    feedback.push("Good password structure.");
+  }
+
+  return {
+    score,
+    label,
+    percentage: (score / 5) * 100,
+    feedback,
+  };
 }

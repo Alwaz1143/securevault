@@ -1,32 +1,78 @@
-import crypto from "crypto";
+export type BreachCheckResult = {
+  isPwned: boolean;
+  breachCount: number;
+  hashPrefix: string;
+};
 
-/**
- * Checks a password against the HaveIBeenPwned Passwords API
- * using the k-Anonymity model (only the first 5 chars of the SHA1 hash are sent).
- * Returns the number of times the password appeared in breaches (0 = not found).
- */
-export async function checkPasswordBreach(password: string): Promise<number> {
-  const sha1 = crypto.createHash("sha1").update(password).digest("hex").toUpperCase();
-  const prefix = sha1.slice(0, 5);
-  const suffix = sha1.slice(5);
+function arrayBufferToHex(buffer: ArrayBuffer) {
+  const bytes = new Uint8Array(buffer);
 
-  const res = await fetch(`https://api.pwnedpasswords.com/range/${prefix}`, {
-    headers: { "Add-Padding": "true" },
-  });
+  return Array.from(bytes)
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("")
+    .toUpperCase();
+}
 
-  if (!res.ok) {
-    throw new Error(`HIBP API error: ${res.status}`);
+async function sha1Hash(password: string) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password);
+
+  const hashBuffer = await crypto.subtle.digest("SHA-1", data);
+
+  return arrayBufferToHex(hashBuffer);
+}
+
+export async function checkPasswordBreach(
+  password: string
+): Promise<BreachCheckResult> {
+  if (!password) {
+    throw new Error("Password is required.");
   }
 
-  const text = await res.text();
-  const lines = text.split("\n");
+  const fullHash = await sha1Hash(password);
+
+  const hashPrefix = fullHash.slice(0, 5);
+  const hashSuffix = fullHash.slice(5);
+
+  const response = await fetch(
+    `https://api.pwnedpasswords.com/range/${hashPrefix}`,
+    {
+      method: "GET",
+      headers: {
+        "Add-Padding": "true",
+      },
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error("Failed to check password breach status.");
+  }
+
+  const responseText = await response.text();
+
+  const lines = responseText.split("\r\n");
 
   for (const line of lines) {
-    const [hash, count] = line.trim().split(":");
-    if (hash === suffix) {
-      return parseInt(count, 10);
+    const [returnedSuffix, countText] = line.split(":");
+
+    if (!returnedSuffix || !countText) {
+      continue;
+    }
+
+    if (returnedSuffix.toUpperCase() === hashSuffix) {
+      const breachCount = Number(countText);
+
+      return {
+        isPwned: breachCount > 0,
+        breachCount,
+        hashPrefix,
+      };
     }
   }
 
-  return 0;
+  return {
+    isPwned: false,
+    breachCount: 0,
+    hashPrefix,
+  };
 }

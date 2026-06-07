@@ -40,7 +40,7 @@ export default function DashboardShell({
   description,
 }: DashboardShellProps) {
   const pathname = usePathname();
-  const { isVaultUnlocked, lockVault } = useVault();
+  const { isVaultUnlocked, autoLockTimeoutMinutes, lockVault } = useVault();
 
   return (
     <main className="min-h-screen bg-slate-950 text-white">
@@ -61,11 +61,10 @@ export default function DashboardShell({
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`block rounded-xl px-4 py-3 text-sm font-medium transition ${
-                    isActive
-                      ? "bg-cyan-400 text-slate-950"
-                      : "text-slate-300 hover:bg-slate-800 hover:text-white"
-                  }`}
+                  className={`block rounded-xl px-4 py-3 text-sm font-medium transition ${isActive
+                    ? "bg-cyan-400 text-slate-950"
+                    : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                    }`}
                 >
                   {item.label}
                 </Link>
@@ -79,22 +78,22 @@ export default function DashboardShell({
             </p>
 
             <p
-              className={`mt-2 text-sm ${
-                isVaultUnlocked ? "text-emerald-300" : "text-yellow-300"
-              }`}
+              className={`mt-2 text-sm ${isVaultUnlocked ? "text-emerald-300" : "text-yellow-300"
+                }`}
             >
               {isVaultUnlocked ? "Unlocked" : "Locked"}
             </p>
 
             <p className="mt-2 text-xs leading-5 text-slate-500">
               {isVaultUnlocked
-                ? "Vault features are available for this browser session."
+                ? `Vault will auto-lock after ${autoLockTimeoutMinutes} minute${autoLockTimeoutMinutes > 1 ? "s" : ""
+                } of inactivity.`
                 : "Enter your master password to unlock vault features."}
             </p>
 
             {isVaultUnlocked && (
               <button
-                onClick={lockVault}
+                onClick={() => lockVault("manual_lock_from_sidebar")}
                 className="mt-4 w-full rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-300 transition hover:border-red-400 hover:text-red-300"
               >
                 Lock Vault

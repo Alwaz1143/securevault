@@ -50,7 +50,7 @@ export default function MasterPasswordUnlock() {
           </div>
 
           <button
-            onClick={lockVault}
+            onClick={() => lockVault("manual_lock_from_unlock_panel")}
             className="rounded-xl border border-emerald-400/40 px-5 py-3 font-semibold text-emerald-200 transition hover:bg-emerald-400 hover:text-slate-950"
           >
             Lock Vault

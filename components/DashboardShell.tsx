@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
+import { useVault } from "@/contexts/VaultContext";
 
 type DashboardShellProps = {
   children: React.ReactNode;
@@ -39,6 +40,7 @@ export default function DashboardShell({
   description,
 }: DashboardShellProps) {
   const pathname = usePathname();
+  const { isVaultUnlocked, lockVault } = useVault();
 
   return (
     <main className="min-h-screen bg-slate-950 text-white">
@@ -75,11 +77,29 @@ export default function DashboardShell({
             <p className="text-sm font-semibold text-slate-200">
               Vault Status
             </p>
-            <p className="mt-2 text-sm text-yellow-300">Locked</p>
-            <p className="mt-2 text-xs leading-5 text-slate-500">
-              Later, the vault will unlock only after entering the master
-              password.
+
+            <p
+              className={`mt-2 text-sm ${
+                isVaultUnlocked ? "text-emerald-300" : "text-yellow-300"
+              }`}
+            >
+              {isVaultUnlocked ? "Unlocked" : "Locked"}
             </p>
+
+            <p className="mt-2 text-xs leading-5 text-slate-500">
+              {isVaultUnlocked
+                ? "Vault features are available for this browser session."
+                : "Enter your master password to unlock vault features."}
+            </p>
+
+            {isVaultUnlocked && (
+              <button
+                onClick={lockVault}
+                className="mt-4 w-full rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-300 transition hover:border-red-400 hover:text-red-300"
+              >
+                Lock Vault
+              </button>
+            )}
           </div>
         </aside>
 

@@ -1,3 +1,4 @@
+import CryptoTestPanel from "@/components/CryptoTestPanel";
 import DashboardShell from "@/components/DashboardShell";
 import MasterPasswordUnlock from "@/components/MasterPasswordUnlock";
 
@@ -9,6 +10,8 @@ export default function DashboardPage() {
     >
       <div className="space-y-8">
         <MasterPasswordUnlock />
+
+        <CryptoTestPanel />
 
         <div className="grid gap-6 md:grid-cols-3">
           <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
@@ -25,7 +28,7 @@ export default function DashboardPage() {
               Client-Side
             </h3>
             <p className="mt-2 text-sm text-slate-500">
-              Vault data will be encrypted before API requests.
+              Vault data is encrypted before API requests.
             </p>
           </div>
 
@@ -41,8 +44,8 @@ export default function DashboardPage() {
         <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
           <h3 className="text-xl font-semibold">Next Milestone</h3>
           <p className="mt-3 text-slate-400">
-            Add PBKDF2 key derivation and AES-GCM encryption using the Web
-            Crypto API.
+            Connect this encryption layer to the vault form so new vault items
+            are encrypted before being sent to the API.
           </p>
         </div>
       </div>

@@ -4,25 +4,28 @@ import { useState } from "react";
 import { useVault } from "@/contexts/VaultContext";
 
 export default function MasterPasswordUnlock() {
-  const { isVaultUnlocked, unlockedAt, unlockVault, lockVault } = useVault();
+  const {
+    isVaultUnlocked,
+    isUnlocking,
+    unlockedAt,
+    unlockVault,
+    lockVault,
+  } = useVault();
+
   const [masterPassword, setMasterPassword] = useState("");
   const [error, setError] = useState("");
 
-  function handleUnlock(event: React.FormEvent<HTMLFormElement>) {
+  async function handleUnlock(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
 
-    const success = unlockVault(masterPassword);
+    const result = await unlockVault(masterPassword);
 
-    if (!success) {
-      setError("Master password must be at least 8 characters for now.");
+    if (!result.ok) {
+      setError(result.message || "Unable to unlock vault.");
       return;
     }
 
-    /*
-      Important:
-      Clear the input after unlocking so the password is not kept in the form.
-    */
     setMasterPassword("");
   }
 
@@ -35,7 +38,8 @@ export default function MasterPasswordUnlock() {
               Vault Unlocked
             </h3>
             <p className="mt-2 text-sm text-emerald-100/80">
-              Your vault is unlocked in this browser session.
+              Your vault key was derived in the browser using your master
+              password.
             </p>
 
             {unlockedAt && (
@@ -63,9 +67,9 @@ export default function MasterPasswordUnlock() {
       </h3>
 
       <p className="mt-2 text-sm leading-6 text-yellow-100/80">
-        Enter your master password to unlock vault features. This password is
-        different from your Clerk login password and will not be sent to the
-        backend.
+        Enter your master password to derive your encryption key in the browser.
+        This password is different from your Clerk login password and is not
+        sent to the backend.
       </p>
 
       <form onSubmit={handleUnlock} className="mt-6 space-y-4">
@@ -91,17 +95,18 @@ export default function MasterPasswordUnlock() {
 
         <button
           type="submit"
-          className="rounded-xl bg-cyan-400 px-5 py-3 font-semibold text-slate-950 transition hover:bg-cyan-300"
+          disabled={isUnlocking}
+          className="rounded-xl bg-cyan-400 px-5 py-3 font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          Unlock Vault
+          {isUnlocking ? "Deriving Key..." : "Unlock Vault"}
         </button>
       </form>
 
       <div className="mt-5 rounded-xl border border-slate-800 bg-slate-950 p-4">
         <p className="text-xs leading-5 text-slate-400">
-          Security note: In this step, the master password only controls the UI
-          lock state. In the next encryption step, it will be used to derive an
-          AES-GCM encryption key using PBKDF2.
+          Security note: PBKDF2 derives an AES-GCM key from your master
+          password. The salt is stored because it is not secret. The master
+          password and encryption key are not stored in the database.
         </p>
       </div>
     </div>

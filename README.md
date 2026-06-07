@@ -27,6 +27,33 @@ The goal of this project is to demonstrate secure full-stack development, authen
 
 ---
 
+## Screenshots
+
+Coming soon.
+
+---
+
+## Project Status
+
+MVP completed locally.
+
+Implemented:
+- Authentication
+- Encrypted vault CRUD
+- Master password verifier
+- Password tools
+- Breach checker
+- Audit logs
+- Auto-lock
+
+Pending:
+- Deployment
+- Screenshots
+- Demo video
+- Advanced security testing
+
+---
+
 ## Tech Stack
 
 ### Frontend
@@ -73,7 +100,7 @@ Only ciphertext and IV are sent to the backend
 PostgreSQL stores encrypted vault data
         ↓
 When viewing vault items, encrypted data is fetched and decrypted locally
-````
+```
 
 ---
 
@@ -350,6 +377,8 @@ Install dependencies:
 npm install
 ```
 
+Make sure your `.env` and `.env.local` files are configured before running Prisma commands.
+
 Run Prisma migration:
 
 ```bash
@@ -455,6 +484,6 @@ Known limitations:
 ---
 
 
-> ## Disclaimer
+## Disclaimer
 > SecureVault is a portfolio and learning project designed to demonstrate secure application architecture concepts. It should not be used as a real production password manager without professional security review, hardened deployment, and extensive testing.
 

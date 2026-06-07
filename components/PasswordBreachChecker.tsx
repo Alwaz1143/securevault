@@ -3,6 +3,27 @@
 import { useState } from "react";
 import { checkPasswordBreach, type BreachCheckResult } from "@/lib/hibp";
 
+async function logBreachCheck(result: BreachCheckResult) {
+  try {
+    await fetch("/api/audit-logs", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        action: "BREACH_CHECK_PERFORMED",
+        metadata: {
+          isPwned: result.isPwned,
+          breachCount: result.breachCount,
+          hashPrefix: result.hashPrefix,
+        },
+      }),
+    });
+  } catch (error) {
+    console.error("Failed to create breach check audit log:", error);
+  }
+}
+
 export default function PasswordBreachChecker() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -25,6 +46,8 @@ export default function PasswordBreachChecker() {
       const breachResult = await checkPasswordBreach(password);
 
       setResult(breachResult);
+
+      await logBreachCheck(breachResult);
     } catch (error) {
       console.error("Breach check failed:", error);
       setError("Failed to check breach status. Please try again.");
@@ -132,9 +155,9 @@ export default function PasswordBreachChecker() {
 
       <div className="mt-5 rounded-xl border border-slate-800 bg-slate-950 p-4">
         <p className="text-xs leading-5 text-slate-500">
-          Security note: SHA-1 is used here only because HIBP indexes breached
-          passwords by SHA-1 hash range. This is not password storage. We are not
-          hashing passwords for authentication.
+          Security note: The breach-check audit log stores only safe metadata:
+          breach result, breach count, and hash prefix. It does not store the
+          password or full SHA-1 hash.
         </p>
       </div>
     </div>

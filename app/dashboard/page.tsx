@@ -1,4 +1,3 @@
-import CryptoTestPanel from "@/components/CryptoTestPanel";
 import DashboardOverview from "@/components/DashboardOverview";
 import DashboardShell from "@/components/DashboardShell";
 import MasterPasswordUnlock from "@/components/MasterPasswordUnlock";
@@ -13,8 +12,6 @@ export default function DashboardPage() {
         <MasterPasswordUnlock />
 
         <DashboardOverview />
-
-        <CryptoTestPanel />
       </div>
     </DashboardShell>
   );

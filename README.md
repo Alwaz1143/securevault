@@ -34,28 +34,40 @@ https://securevault-umber.vercel.app/
 
 ## Screenshots
 
-Coming soon.
+### Landing Page
+![Landing Page](./public/screenshots/home.png)
+
+### Dashboard
+![Dashboard](./public/screenshots/dashboard.png)
+
+### Vault
+![Vault](./public/screenshots/vault.png)
+
+### Password Tools
+![Password Tools](./public/screenshots/tools.png)
+
+### Audit Logs
+![Audit Logs](./public/screenshots/audit-logs.png)
+
+### Settings
+![Settings](./public/screenshots/settings.png)
 
 ---
 
 ## Project Status
 
-MVP completed locally.
+MVP completed and deployed.
 
-Implemented:
-- Authentication
+Core features implemented:
+- Clerk authentication
+- Client-side encryption
 - Encrypted vault CRUD
 - Master password verifier
-- Password tools
-- Breach checker
+- Password generator
+- Strength checker
+- HIBP breach checker
 - Audit logs
 - Auto-lock
-
-Pending:
-- Deployment
-- Screenshots
-- Demo video
-- Advanced security testing
 
 ---
 

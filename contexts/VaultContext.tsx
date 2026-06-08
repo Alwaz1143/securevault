@@ -253,7 +253,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    let timeoutId: ReturnType<typeof setTimeout>;
+    let timeoutId: number;
 
     function resetAutoLockTimer() {
       window.clearTimeout(timeoutId);

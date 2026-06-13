@@ -10,7 +10,7 @@ The goal of this project is to demonstrate secure full-stack development, authen
 
 ## Live Demo
 
-https://securevault-umber.vercel.app/
+https://securevault.alwaz.tech
 
 ---
 ## Features

@@ -23,6 +23,8 @@ type EncryptedVaultItem = {
     updatedAt: string;
 };
 
+type DecryptedVaultListItem = EncryptedVaultItem & VaultPlaintextItem;
+
 type VaultFormState = {
     title: string;
     username: string;
@@ -31,6 +33,14 @@ type VaultFormState = {
     notes: string;
     category: string;
 };
+
+type VaultSortOption =
+    | "updated_desc"
+    | "updated_asc"
+    | "title_asc"
+    | "title_desc";
+
+type VaultRiskFilter = "all" | "weak_passwords" | "missing_urls";
 
 const emptyForm: VaultFormState = {
     title: "",
@@ -108,9 +118,16 @@ export default function VaultManager() {
         useState<PasswordGeneratorOptions>(DEFAULT_PASSWORD_OPTIONS);
     const [isFormPasswordVisible, setIsFormPasswordVisible] = useState(false);
 
+    const [searchQuery, setSearchQuery] = useState("");
+    const [categoryFilter, setCategoryFilter] = useState("all");
+    const [riskFilter, setRiskFilter] = useState<VaultRiskFilter>("all");
+    const [sortOption, setSortOption] =
+        useState<VaultSortOption>("updated_desc");
+
     const [isLoading, setIsLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState("");
+
     const [formMessage, setFormMessage] = useState("");
     const [listMessage, setListMessage] = useState("");
     const [decryptWarning, setDecryptWarning] = useState("");
@@ -120,7 +137,7 @@ export default function VaultManager() {
 
     const decryptedList = useMemo(() => {
         return encryptedItems
-            .map((item) => {
+            .map((item): DecryptedVaultListItem | null => {
                 const decrypted = decryptedItems[item.id];
 
                 if (!decrypted) {
@@ -136,8 +153,73 @@ export default function VaultManager() {
                     ...decrypted,
                 };
             })
-            .filter(Boolean);
+            .filter(
+                (item): item is DecryptedVaultListItem => item !== null
+            );
     }, [encryptedItems, decryptedItems]);
+
+    const categoryOptions = useMemo(() => {
+        const categories = decryptedList
+            .map((item) => item.category?.trim())
+            .filter((category): category is string => Boolean(category));
+
+        return Array.from(new Set(categories)).sort((firstCategory, secondCategory) =>
+            firstCategory.localeCompare(secondCategory)
+        );
+    }, [decryptedList]);
+
+    const filteredDecryptedList = useMemo(() => {
+        const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+
+        const filteredItems = decryptedList.filter((item) => {
+            const matchesSearch =
+                !normalizedSearchQuery ||
+                [
+                    item.title,
+                    item.username,
+                    item.url ?? "",
+                    item.category ?? "",
+                    item.notes ?? "",
+                ]
+                    .join(" ")
+                    .toLowerCase()
+                    .includes(normalizedSearchQuery);
+
+            const matchesCategory =
+                categoryFilter === "all" || item.category === categoryFilter;
+
+            const passwordStrength = evaluatePasswordStrength(item.password);
+
+            const matchesRisk =
+                riskFilter === "all" ||
+                (riskFilter === "weak_passwords" && passwordStrength.score <= 2) ||
+                (riskFilter === "missing_urls" && !item.url?.trim());
+
+            return matchesSearch && matchesCategory && matchesRisk;
+        });
+
+        return [...filteredItems].sort((firstItem, secondItem) => {
+            if (sortOption === "title_asc") {
+                return firstItem.title.localeCompare(secondItem.title);
+            }
+
+            if (sortOption === "title_desc") {
+                return secondItem.title.localeCompare(firstItem.title);
+            }
+
+            if (sortOption === "updated_asc") {
+                return (
+                    new Date(firstItem.updatedAt).getTime() -
+                    new Date(secondItem.updatedAt).getTime()
+                );
+            }
+
+            return (
+                new Date(secondItem.updatedAt).getTime() -
+                new Date(firstItem.updatedAt).getTime()
+            );
+        });
+    }, [decryptedList, searchQuery, categoryFilter, riskFilter, sortOption]);
 
     const formPasswordStrength = useMemo(() => {
         return evaluatePasswordStrength(form.password);
@@ -480,6 +562,12 @@ export default function VaultManager() {
             [itemId]: !current[itemId],
         }));
     }
+    function clearVaultFilters() {
+        setSearchQuery("");
+        setCategoryFilter("all");
+        setRiskFilter("all");
+        setSortOption("updated_desc");
+    }
 
     if (!isVaultUnlocked) {
         return (
@@ -793,6 +881,107 @@ export default function VaultManager() {
                         {isLoading ? "Refreshing..." : "Refresh"}
                     </button>
                 </div>
+                <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-950 p-4">
+                    <div className="grid gap-4 lg:grid-cols-4">
+                        <div className="lg:col-span-2">
+                            <label className="text-sm font-medium text-slate-300">
+                                Search Vault
+                            </label>
+
+                            <input
+                                value={searchQuery}
+                                onChange={(event) => setSearchQuery(event.target.value)}
+                                placeholder="Search by title, username, URL, category, or notes"
+                                className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-cyan-400"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="text-sm font-medium text-slate-300">Category</label>
+
+                            <select
+                                value={categoryFilter}
+                                onChange={(event) => setCategoryFilter(event.target.value)}
+                                className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-slate-100 outline-none transition focus:border-cyan-400"
+                            >
+                                <option value="all">All Categories</option>
+
+                                {categoryOptions.map((category) => (
+                                    <option key={category} value={category}>
+                                        {category}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="text-sm font-medium text-slate-300">Sort</label>
+
+                            <select
+                                value={sortOption}
+                                onChange={(event) =>
+                                    setSortOption(event.target.value as VaultSortOption)
+                                }
+                                className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-slate-100 outline-none transition focus:border-cyan-400"
+                            >
+                                <option value="updated_desc">Recently Updated</option>
+                                <option value="updated_asc">Oldest Updated</option>
+                                <option value="title_asc">Title A-Z</option>
+                                <option value="title_desc">Title Z-A</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="mt-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                        <div className="flex flex-wrap gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setRiskFilter("all")}
+                                className={`rounded-full border px-4 py-2 text-xs font-semibold transition ${riskFilter === "all"
+                                    ? "border-cyan-400 bg-cyan-400 text-slate-950"
+                                    : "border-slate-700 text-slate-300 hover:border-cyan-400 hover:text-cyan-300"
+                                    }`}
+                            >
+                                All Items
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setRiskFilter("weak_passwords")}
+                                className={`rounded-full border px-4 py-2 text-xs font-semibold transition ${riskFilter === "weak_passwords"
+                                    ? "border-yellow-400 bg-yellow-400 text-slate-950"
+                                    : "border-slate-700 text-slate-300 hover:border-yellow-400 hover:text-yellow-300"
+                                    }`}
+                            >
+                                Weak Passwords
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setRiskFilter("missing_urls")}
+                                className={`rounded-full border px-4 py-2 text-xs font-semibold transition ${riskFilter === "missing_urls"
+                                    ? "border-orange-400 bg-orange-400 text-slate-950"
+                                    : "border-slate-700 text-slate-300 hover:border-orange-400 hover:text-orange-300"
+                                    }`}
+                            >
+                                Missing URLs
+                            </button>
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={clearVaultFilters}
+                            className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-300 transition hover:border-red-400 hover:text-red-300"
+                        >
+                            Clear Filters
+                        </button>
+                    </div>
+
+                    <p className="mt-4 text-sm text-slate-500">
+                        Showing {filteredDecryptedList.length} of {decryptedList.length} vault item
+                        {decryptedList.length === 1 ? "" : "s"}.
+                    </p>
+                </div>
                 {listMessage && (
                     <p className="mt-4 text-sm text-emerald-300">{listMessage}</p>
                 )}
@@ -811,8 +1000,28 @@ export default function VaultManager() {
                     </div>
                 )}
 
+                {!isLoading &&
+                    decryptedList.length > 0 &&
+                    filteredDecryptedList.length === 0 && (
+                        <div className="mt-8 rounded-xl border border-dashed border-slate-700 p-8 text-center">
+                            <p className="text-slate-300">No items match your filters.</p>
+
+                            <p className="mt-2 text-sm text-slate-500">
+                                Try changing your search, category, risk filter, or sort settings.
+                            </p>
+
+                            <button
+                                type="button"
+                                onClick={clearVaultFilters}
+                                className="mt-4 rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-300 transition hover:border-cyan-400 hover:text-cyan-300"
+                            >
+                                Clear Filters
+                            </button>
+                        </div>
+                    )}
+
                 <div className="mt-6 grid gap-4">
-                    {decryptedList.map((item) => {
+                    {filteredDecryptedList.map((item) => {
                         if (!item) {
                             return null;
                         }
@@ -834,6 +1043,17 @@ export default function VaultManager() {
                                             {item.category && (
                                                 <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1 text-xs text-cyan-300">
                                                     {item.category}
+                                                </span>
+                                            )}
+                                            {evaluatePasswordStrength(item.password).score <= 2 && (
+                                                <span className="rounded-full border border-yellow-500/30 bg-yellow-500/10 px-3 py-1 text-xs text-yellow-300">
+                                                    Weak Password
+                                                </span>
+                                            )}
+
+                                            {!item.url?.trim() && (
+                                                <span className="rounded-full border border-orange-500/30 bg-orange-500/10 px-3 py-1 text-xs text-orange-300">
+                                                    Missing URL
                                                 </span>
                                             )}
                                         </div>

@@ -1,10 +1,12 @@
 "use client";
-
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useVault } from "@/contexts/VaultContext";
 import { decryptVaultData, type VaultPlaintextItem } from "@/lib/crypto";
+import { checkPasswordBreach } from "@/lib/hibp";
 import {
   analyzeVaultSecurity,
+  type BreachStatusMap,
   type SecurityRisk,
   type SecurityRiskSeverity,
   type VaultSecurityInputItem,
@@ -48,6 +50,7 @@ function getScoreColor(score: number) {
 
 function getRiskTypeLabel(type: SecurityRisk["type"]) {
   const labels: Record<SecurityRisk["type"], string> = {
+    breached_password: "Breached Password",
     weak_password: "Weak Password",
     reused_password: "Reused Password",
     old_password: "Old Password",
@@ -107,6 +110,30 @@ function RiskCard({ risk }: { risk: SecurityRisk }) {
 
       <p className="mt-4 text-sm leading-6 text-slate-300">{risk.message}</p>
 
+      {typeof risk.breachCount === "number" && (
+        <p className="mt-2 text-sm text-red-300">
+          Seen in breach datasets: {risk.breachCount.toLocaleString()} time(s)
+        </p>
+      )}
+      <div className="mt-4 flex flex-wrap gap-2">
+        {risk.url && (
+          <a
+            href={risk.url}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:border-emerald-400 hover:text-emerald-300"
+          >
+            Open Site
+          </a>
+        )}
+
+        <Link
+          href={`/vault?edit=${risk.itemId}`}
+          className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:border-yellow-400 hover:text-yellow-300"
+        >
+          Edit Vault Item
+        </Link>
+      </div>
       <p className="mt-3 text-sm leading-6 text-cyan-300">
         Recommended action: {risk.recommendation}
       </p>
@@ -130,19 +157,50 @@ export default function SecurityCenterPanel() {
   const { isVaultUnlocked, vaultKey } = useVault();
 
   const [items, setItems] = useState<VaultSecurityInputItem[]>([]);
+  const [breachStatusByItemId, setBreachStatusByItemId] =
+    useState<BreachStatusMap>({});
   const [isLoading, setIsLoading] = useState(false);
+  const [isBreachScanning, setIsBreachScanning] = useState(false);
   const [error, setError] = useState("");
   const [decryptWarning, setDecryptWarning] = useState("");
+  const [breachScanMessage, setBreachScanMessage] = useState("");
 
   const report: VaultSecurityReport = useMemo(() => {
-    return analyzeVaultSecurity(items);
-  }, [items]);
+    return analyzeVaultSecurity(items, breachStatusByItemId);
+  }, [items, breachStatusByItemId]);
+
+  const checkedBreachCount = Object.values(breachStatusByItemId).filter(
+    (status) => status.isChecked
+  ).length;
+
+  const failedBreachCheckCount = Object.values(breachStatusByItemId).filter(
+    (status) => status.error
+  ).length;
+
+  async function createBreachAuditLog(metadata: Record<string, number>) {
+    try {
+      await fetch("/api/audit-logs", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action: "BREACH_CHECK_PERFORMED",
+          metadata,
+        }),
+      });
+    } catch (error) {
+      console.error("Failed to create breach scan audit log:", error);
+    }
+  }
 
   async function loadSecurityReport() {
     try {
       setIsLoading(true);
       setError("");
       setDecryptWarning("");
+      setBreachScanMessage("");
+      setBreachStatusByItemId({});
 
       if (!vaultKey) {
         setError("Vault key is missing. Lock and unlock the vault again.");
@@ -161,7 +219,6 @@ export default function SecurityCenterPanel() {
       }
 
       const encryptedVaultItems = data.items as EncryptedVaultItem[];
-
       const decryptedVaultItems: VaultSecurityInputItem[] = [];
       let failedDecryptCount = 0;
 
@@ -200,11 +257,97 @@ export default function SecurityCenterPanel() {
     }
   }
 
+  async function runFullVaultBreachScan() {
+    try {
+      setIsBreachScanning(true);
+      setError("");
+      setBreachScanMessage("");
+
+      if (items.length === 0) {
+        setBreachScanMessage("Add vault items before running a breach scan.");
+        return;
+      }
+
+      const passwordResultCache = new Map<
+        string,
+        { isPwned: boolean; breachCount: number }
+      >();
+
+      const nextBreachStatus: BreachStatusMap = {};
+      let breachedItems = 0;
+      let failedItems = 0;
+
+      for (const item of items) {
+        const password = item.password.trim();
+
+        if (!password) {
+          continue;
+        }
+
+        try {
+          let breachResult = passwordResultCache.get(password);
+
+          if (!breachResult) {
+            const result = await checkPasswordBreach(password);
+
+            breachResult = {
+              isPwned: result.isPwned,
+              breachCount: result.breachCount,
+            };
+
+            passwordResultCache.set(password, breachResult);
+          }
+
+          if (breachResult.isPwned) {
+            breachedItems++;
+          }
+
+          nextBreachStatus[item.id] = {
+            isChecked: true,
+            isPwned: breachResult.isPwned,
+            breachCount: breachResult.breachCount,
+          };
+        } catch (error) {
+          console.error(`Failed to run breach check for ${item.id}:`, error);
+          failedItems++;
+
+          nextBreachStatus[item.id] = {
+            isChecked: true,
+            isPwned: false,
+            breachCount: 0,
+            error: "Breach check failed for this item.",
+          };
+        }
+      }
+
+      setBreachStatusByItemId(nextBreachStatus);
+
+      await createBreachAuditLog({
+        checkedItems: Object.keys(nextBreachStatus).length,
+        breachedItems,
+        failedItems,
+      });
+
+      setBreachScanMessage(
+        breachedItems > 0
+          ? `${breachedItems} item(s) use passwords found in known breach datasets.`
+          : "Breach scan completed. No breached passwords were found."
+      );
+    } catch (error) {
+      console.error("Failed to run full vault breach scan:", error);
+      setError("Failed to run full vault breach scan. Please try again.");
+    } finally {
+      setIsBreachScanning(false);
+    }
+  }
+
   useEffect(() => {
     if (!isVaultUnlocked || !vaultKey) {
       setItems([]);
+      setBreachStatusByItemId({});
       setError("");
       setDecryptWarning("");
+      setBreachScanMessage("");
       return;
     }
 
@@ -236,14 +379,14 @@ export default function SecurityCenterPanel() {
 
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
               This report decrypts vault items locally in your browser and
-              checks for weak, reused, old, and poorly organized credentials.
-              Plaintext passwords are not sent to the server for this analysis.
+              checks for weak, reused, old, missing URL, and breached
+              credentials. Plaintext passwords are never sent to your server.
             </p>
           </div>
 
           <button
             onClick={loadSecurityReport}
-            disabled={isLoading}
+            disabled={isLoading || isBreachScanning}
             className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-300 transition hover:border-cyan-400 hover:text-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isLoading ? "Analyzing..." : "Refresh Report"}
@@ -254,6 +397,59 @@ export default function SecurityCenterPanel() {
 
         {decryptWarning && (
           <p className="mt-4 text-sm text-yellow-300">{decryptWarning}</p>
+        )}
+      </section>
+
+      <section className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
+        <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
+          <div>
+            <h3 className="text-xl font-semibold">Full Vault Breach Scan</h3>
+
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
+              Checks every decrypted vault password against the HaveIBeenPwned
+              range API. SecureVault sends only the first 5 characters of each
+              SHA-1 hash prefix, never the plaintext password.
+            </p>
+          </div>
+
+          <button
+            onClick={runFullVaultBreachScan}
+            disabled={isBreachScanning || isLoading || items.length === 0}
+            className="rounded-xl bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isBreachScanning ? "Scanning..." : "Run Breach Scan"}
+          </button>
+        </div>
+
+        <div className="mt-5 grid gap-4 md:grid-cols-3">
+          <StatCard
+            label="Checked Items"
+            value={checkedBreachCount}
+            helper="Vault items checked during the current scan."
+          />
+
+          <StatCard
+            label="Breached Passwords"
+            value={report.breachedPasswordCount}
+            helper="Passwords found in known breach datasets."
+          />
+
+          <StatCard
+            label="Failed Checks"
+            value={failedBreachCheckCount}
+            helper="Items that could not be checked due to network/API errors."
+          />
+        </div>
+
+        {breachScanMessage && (
+          <p
+            className={`mt-4 text-sm ${report.breachedPasswordCount > 0
+                ? "text-red-300"
+                : "text-emerald-300"
+              }`}
+          >
+            {breachScanMessage}
+          </p>
         )}
       </section>
 
@@ -285,8 +481,8 @@ export default function SecurityCenterPanel() {
           </div>
 
           <p className="mt-3 text-xs leading-5 text-slate-500">
-            Score is calculated locally using password strength, reuse, age, URL
-            completeness, and organization signals.
+            Score is calculated locally using breach status, password strength,
+            reuse, age, URL completeness, and organization signals.
           </p>
         </div>
 
@@ -307,7 +503,7 @@ export default function SecurityCenterPanel() {
         <StatCard
           label="Critical Risks"
           value={report.criticalCount}
-          helper="Usually reused passwords. Fix these first."
+          helper="Breached or reused passwords. Fix these first."
         />
 
         <StatCard
@@ -335,8 +531,8 @@ export default function SecurityCenterPanel() {
             <h3 className="text-xl font-semibold">Fix Priority</h3>
 
             <p className="mt-2 text-sm leading-6 text-slate-400">
-              Start with critical and high-risk issues before improving low-risk
-              organization problems.
+              Start with breached, reused, and weak passwords before improving
+              low-risk organization issues.
             </p>
           </div>
 
@@ -370,8 +566,9 @@ export default function SecurityCenterPanel() {
             </p>
 
             <p className="mt-2 text-sm leading-6 text-slate-300">
-              Your current vault items look healthy based on local checks. Keep
-              using unique passwords and update important accounts regularly.
+              Your current vault items look healthy based on local checks. Run a
+              breach scan when you want to verify exposure against known breach
+              datasets.
             </p>
           </div>
         )}

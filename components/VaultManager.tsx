@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useVault } from "@/contexts/VaultContext";
 import {
     decryptVaultData,
@@ -48,6 +48,40 @@ function normalizeUrl(url: string) {
     return `https://${trimmedUrl}`;
 }
 
+function getEditItemIdFromUrl() {
+    if (typeof window === "undefined") {
+        return null;
+    }
+
+    const searchParams = new URLSearchParams(window.location.search);
+    return searchParams.get("edit");
+}
+
+function updateEditQueryParam(itemId: string) {
+    if (typeof window === "undefined") {
+        return;
+    }
+
+    const currentUrl = new URL(window.location.href);
+    currentUrl.searchParams.set("edit", itemId);
+    window.history.replaceState(null, "", currentUrl.toString());
+}
+
+function clearEditQueryParam() {
+    if (typeof window === "undefined") {
+        return;
+    }
+
+    const currentUrl = new URL(window.location.href);
+
+    if (!currentUrl.searchParams.has("edit")) {
+        return;
+    }
+
+    currentUrl.searchParams.delete("edit");
+    window.history.replaceState(null, "", currentUrl.toString());
+}
+
 export default function VaultManager() {
     const { isVaultUnlocked, vaultKey } = useVault();
 
@@ -58,13 +92,16 @@ export default function VaultManager() {
         Record<string, VaultPlaintextItem>
     >({});
 
+    const formRef = useRef<HTMLFormElement | null>(null);
+
     const [form, setForm] = useState<VaultFormState>(emptyForm);
     const [editingId, setEditingId] = useState<string | null>(null);
 
     const [isLoading, setIsLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState("");
-    const [successMessage, setSuccessMessage] = useState("");
+    const [formMessage, setFormMessage] = useState("");
+    const [listMessage, setListMessage] = useState("");
     const [decryptWarning, setDecryptWarning] = useState("");
     const [visiblePasswords, setVisiblePasswords] = useState<
         Record<string, boolean>
@@ -98,7 +135,8 @@ export default function VaultManager() {
             setEditingId(null);
             setForm(emptyForm);
             setError("");
-            setSuccessMessage("");
+            setFormMessage("");
+            setListMessage("");
             setDecryptWarning("");
             return;
         }
@@ -107,11 +145,30 @@ export default function VaultManager() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isVaultUnlocked, vaultKey]);
 
+    useEffect(() => {
+        if (!isVaultUnlocked) {
+            return;
+        }
+
+        const editItemId = getEditItemIdFromUrl();
+
+        if (!editItemId || editingId === editItemId) {
+            return;
+        }
+
+        if (decryptedItems[editItemId]) {
+            startEditing(editItemId);
+        }
+
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isVaultUnlocked, decryptedItems, editingId]);
+
     async function loadAndDecryptVaultItems() {
         try {
             setIsLoading(true);
             setError("");
-            setSuccessMessage("");
+            setFormMessage("");
+            setListMessage("");
             setDecryptWarning("");
 
             if (!vaultKey) {
@@ -197,7 +254,8 @@ export default function VaultManager() {
 
         try {
             setError("");
-            setSuccessMessage("");
+            setFormMessage("");
+            setListMessage("");
 
             if (!isVaultUnlocked || !vaultKey) {
                 setError("Unlock the vault before saving items.");
@@ -244,12 +302,13 @@ export default function VaultManager() {
                 throw new Error(data.message || "Failed to save vault item.");
             }
 
-            setForm(emptyForm);
             setEditingId(null);
+            setForm(emptyForm);
+            clearEditQueryParam();
 
             await loadAndDecryptVaultItems();
 
-            setSuccessMessage(
+            setFormMessage(
                 editingId
                     ? "Vault item updated securely."
                     : "Vault item encrypted and saved securely."
@@ -261,7 +320,6 @@ export default function VaultManager() {
             setIsSaving(false);
         }
     }
-
     function startEditing(itemId: string) {
         const item = decryptedItems[itemId];
 
@@ -281,15 +339,28 @@ export default function VaultManager() {
             category: item.category ?? "",
         });
 
-        setSuccessMessage("");
+        setFormMessage(
+            `Editing ${item.title}. Update the form above, then save changes.`
+        );
+        setListMessage("");
         setError("");
+        updateEditQueryParam(itemId);
+
+        window.setTimeout(() => {
+            formRef.current?.scrollIntoView({
+                behavior: "smooth",
+                block: "start",
+            });
+        }, 0);
     }
 
     function cancelEditing() {
         setEditingId(null);
         setForm(emptyForm);
+        clearEditQueryParam();
         setError("");
-        setSuccessMessage("");
+        setFormMessage("");
+        setListMessage("");
     }
 
     async function handleDelete(itemId: string) {
@@ -303,7 +374,8 @@ export default function VaultManager() {
             }
 
             setError("");
-            setSuccessMessage("");
+            setFormMessage("");
+            setListMessage("");
 
             const response = await fetch(`/api/vault/${itemId}`, {
                 method: "DELETE",
@@ -325,7 +397,7 @@ export default function VaultManager() {
                 return updatedItems;
             });
 
-            setSuccessMessage("Vault item deleted.");
+            setListMessage("Vault item deleted.");
         } catch (error) {
             console.error("Failed to delete vault item:", error);
             setError("Failed to delete vault item. Please try again.");
@@ -335,7 +407,7 @@ export default function VaultManager() {
     async function copyToClipboard(value: string, label: string) {
         try {
             await navigator.clipboard.writeText(value);
-            setSuccessMessage(`${label} copied to clipboard.`);
+            setListMessage(`${label} copied to clipboard.`);
         } catch {
             setError("Unable to copy to clipboard.");
         }
@@ -363,6 +435,7 @@ export default function VaultManager() {
     return (
         <div className="space-y-8">
             <form
+                ref={formRef}
                 onSubmit={handleSubmit}
                 className="rounded-2xl border border-slate-800 bg-slate-900 p-6"
             >
@@ -492,8 +565,8 @@ export default function VaultManager() {
                 </div>
 
                 {error && <p className="mt-4 text-sm text-red-300">{error}</p>}
-                {successMessage && (
-                    <p className="mt-4 text-sm text-emerald-300">{successMessage}</p>
+                {formMessage && (
+                    <p className="mt-4 text-sm text-emerald-300">{formMessage}</p>
                 )}
                 {decryptWarning && (
                     <p className="mt-4 text-sm text-yellow-300">{decryptWarning}</p>
@@ -530,7 +603,9 @@ export default function VaultManager() {
                         {isLoading ? "Refreshing..." : "Refresh"}
                     </button>
                 </div>
-
+                {listMessage && (
+                    <p className="mt-4 text-sm text-emerald-300">{listMessage}</p>
+                )}
                 {isLoading && (
                     <p className="mt-6 text-sm text-slate-400">
                         Loading and decrypting vault items...

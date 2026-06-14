@@ -51,6 +51,7 @@ function getRiskTypeLabel(type: SecurityRisk["type"]) {
     weak_password: "Weak Password",
     reused_password: "Reused Password",
     old_password: "Old Password",
+    missing_url: "Missing URL",
     missing_category: "Missing Category",
   };
 
@@ -284,8 +285,8 @@ export default function SecurityCenterPanel() {
           </div>
 
           <p className="mt-3 text-xs leading-5 text-slate-500">
-            Score is calculated locally using password strength, reuse, age, and
-            organization signals.
+            Score is calculated locally using password strength, reuse, age, URL
+            completeness, and organization signals.
           </p>
         </div>
 
@@ -322,9 +323,9 @@ export default function SecurityCenterPanel() {
         />
 
         <StatCard
-          label="Old Passwords"
-          value={report.oldPasswordCount}
-          helper="Items not updated for 180+ days."
+          label="Missing URLs"
+          value={report.missingUrlCount}
+          helper="Items without a login page URL saved."
         />
       </section>
 

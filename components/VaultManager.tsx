@@ -20,6 +20,7 @@ type VaultFormState = {
     title: string;
     username: string;
     password: string;
+    url: string;
     notes: string;
     category: string;
 };
@@ -28,9 +29,24 @@ const emptyForm: VaultFormState = {
     title: "",
     username: "",
     password: "",
+    url: "",
     notes: "",
     category: "",
 };
+
+function normalizeUrl(url: string) {
+    const trimmedUrl = url.trim();
+
+    if (!trimmedUrl) {
+        return "";
+    }
+
+    if (trimmedUrl.startsWith("http://") || trimmedUrl.startsWith("https://")) {
+        return trimmedUrl;
+    }
+
+    return `https://${trimmedUrl}`;
+}
 
 export default function VaultManager() {
     const { isVaultUnlocked, vaultKey } = useVault();
@@ -201,6 +217,7 @@ export default function VaultManager() {
                 title: form.title.trim(),
                 username: form.username.trim(),
                 password: form.password,
+                url: normalizeUrl(form.url),
                 notes: form.notes.trim(),
                 category: form.category.trim(),
             };
@@ -259,6 +276,7 @@ export default function VaultManager() {
             title: item.title,
             username: item.username,
             password: item.password,
+            url: item.url ?? "",
             notes: item.notes ?? "",
             category: item.category ?? "",
         });
@@ -426,6 +444,18 @@ export default function VaultManager() {
                     </div>
 
                     <div>
+                        <label className="text-sm font-medium text-slate-300">
+                            Website URL
+                        </label>
+                        <input
+                            value={form.url}
+                            onChange={(event) => updateFormField("url", event.target.value)}
+                            placeholder="https://accounts.google.com"
+                            className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-cyan-400"
+                        />
+                    </div>
+
+                    <div>
                         <label
                             htmlFor="category"
                             className="text-sm font-medium text-slate-200"
@@ -556,6 +586,20 @@ export default function VaultManager() {
                                             </span>
                                         </p>
 
+                                        {item.url && (
+                                            <p className="mt-2 text-sm text-slate-400">
+                                                URL:{" "}
+                                                <a
+                                                    href={item.url}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="text-cyan-300 underline-offset-4 hover:underline"
+                                                >
+                                                    {item.url}
+                                                </a>
+                                            </p>
+                                        )}
+
                                         {item.notes && (
                                             <p className="mt-3 text-sm leading-6 text-slate-500">
                                                 Notes: {item.notes}
@@ -568,6 +612,16 @@ export default function VaultManager() {
                                     </div>
 
                                     <div className="flex flex-wrap gap-2">
+                                        {item.url && (
+                                            <a
+                                                href={item.url}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:border-emerald-400 hover:text-emerald-300"
+                                            >
+                                                Open Site
+                                            </a>
+                                        )}
                                         <button
                                             onClick={() => togglePasswordVisibility(item.id)}
                                             className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:border-cyan-400 hover:text-cyan-300"

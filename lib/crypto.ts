@@ -9,6 +9,7 @@ export type VaultPlaintextItem = {
   title: string;
   username: string;
   password: string;
+  url?: string;
   notes?: string;
   category?: string;
 };

@@ -8,6 +8,13 @@ import {
     type VaultPlaintextItem,
 } from "@/lib/crypto";
 
+import {
+    DEFAULT_PASSWORD_OPTIONS,
+    generatePassword,
+    type PasswordGeneratorOptions,
+} from "@/lib/passwordGenerator";
+import { evaluatePasswordStrength } from "@/lib/passwordStrength";
+
 type EncryptedVaultItem = {
     id: string;
     encryptedData: string;
@@ -97,6 +104,10 @@ export default function VaultManager() {
     const [form, setForm] = useState<VaultFormState>(emptyForm);
     const [editingId, setEditingId] = useState<string | null>(null);
 
+    const [generatorOptions, setGeneratorOptions] =
+        useState<PasswordGeneratorOptions>(DEFAULT_PASSWORD_OPTIONS);
+    const [isFormPasswordVisible, setIsFormPasswordVisible] = useState(false);
+
     const [isLoading, setIsLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState("");
@@ -127,6 +138,10 @@ export default function VaultManager() {
             })
             .filter(Boolean);
     }, [encryptedItems, decryptedItems]);
+
+    const formPasswordStrength = useMemo(() => {
+        return evaluatePasswordStrength(form.password);
+    }, [form.password]);
 
     useEffect(() => {
         if (!isVaultUnlocked || !vaultKey) {
@@ -233,6 +248,50 @@ export default function VaultManager() {
         }));
     }
 
+    function updateGeneratorOption<K extends keyof PasswordGeneratorOptions>(
+        key: K,
+        value: PasswordGeneratorOptions[K]
+    ) {
+        setGeneratorOptions((currentOptions) => ({
+            ...currentOptions,
+            [key]: value,
+        }));
+    }
+
+    function generatePasswordForForm() {
+        try {
+            setError("");
+            setFormMessage("");
+            setListMessage("");
+
+            const password = generatePassword(generatorOptions);
+
+            updateFormField("password", password);
+            setIsFormPasswordVisible(true);
+            setFormMessage(
+                "Strong password generated. Copy it, update the account website, then save this vault item."
+            );
+        } catch (error) {
+            setError(
+                error instanceof Error ? error.message : "Failed to generate password."
+            );
+        }
+    }
+
+    async function copyFormPassword() {
+        try {
+            if (!form.password) {
+                setError("No password available to copy.");
+                return;
+            }
+
+            await navigator.clipboard.writeText(form.password);
+            setFormMessage("Password copied to clipboard.");
+        } catch {
+            setError("Unable to copy password.");
+        }
+    }
+
     function validateForm() {
         if (!form.title.trim()) {
             return "Website/App name is required.";
@@ -304,6 +363,7 @@ export default function VaultManager() {
 
             setEditingId(null);
             setForm(emptyForm);
+            setIsFormPasswordVisible(false);
             clearEditQueryParam();
 
             await loadAndDecryptVaultItems();
@@ -338,7 +398,7 @@ export default function VaultManager() {
             notes: item.notes ?? "",
             category: item.category ?? "",
         });
-
+        setIsFormPasswordVisible(false);
         setFormMessage(
             `Editing ${item.title}. Update the form above, then save changes.`
         );
@@ -357,6 +417,7 @@ export default function VaultManager() {
     function cancelEditing() {
         setEditingId(null);
         setForm(emptyForm);
+        setIsFormPasswordVisible(false);
         clearEditQueryParam();
         setError("");
         setFormMessage("");
@@ -497,23 +558,152 @@ export default function VaultManager() {
                         />
                     </div>
 
-                    <div>
-                        <label
-                            htmlFor="password"
-                            className="text-sm font-medium text-slate-200"
-                        >
-                            Password
-                        </label>
+                    <div className="md:col-span-2">
+                        <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+                            <label className="text-sm font-medium text-slate-300">Password</label>
+
+                            <div className="flex flex-wrap gap-2">
+                                <button
+                                    type="button"
+                                    onClick={generatePasswordForForm}
+                                    className="rounded-lg border border-cyan-500/40 px-3 py-2 text-xs font-semibold text-cyan-300 transition hover:border-cyan-300 hover:text-cyan-200"
+                                >
+                                    Generate Strong Password
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        setIsFormPasswordVisible((currentValue) => !currentValue)
+                                    }
+                                    className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:border-cyan-400 hover:text-cyan-300"
+                                >
+                                    {isFormPasswordVisible ? "Hide" : "Show"}
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={copyFormPassword}
+                                    className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:border-emerald-400 hover:text-emerald-300"
+                                >
+                                    Copy
+                                </button>
+                            </div>
+                        </div>
+
                         <input
-                            id="password"
-                            type="password"
+                            type={isFormPasswordVisible ? "text" : "password"}
                             value={form.password}
-                            onChange={(event) =>
-                                updateFormField("password", event.target.value)
-                            }
+                            onChange={(event) => updateFormField("password", event.target.value)}
                             placeholder="Account password"
                             className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-cyan-400"
                         />
+
+                        <div className="mt-3 rounded-xl border border-slate-800 bg-slate-950 p-4">
+                            <div className="flex items-center justify-between gap-4">
+                                <p className="text-sm text-slate-400">Password Strength</p>
+
+                                <p className="text-sm font-semibold text-cyan-300">
+                                    {formPasswordStrength.label}
+                                </p>
+                            </div>
+
+                            <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-800">
+                                <div
+                                    className="h-full rounded-full bg-cyan-400 transition-all"
+                                    style={{ width: `${formPasswordStrength.percentage}%` }}
+                                />
+                            </div>
+
+                            {formPasswordStrength.feedback.length > 0 && (
+                                <ul className="mt-3 list-disc space-y-1 pl-5 text-xs leading-5 text-slate-500">
+                                    {formPasswordStrength.feedback.map((feedbackItem) => (
+                                        <li key={feedbackItem}>{feedbackItem}</li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
+
+                        <details className="mt-3 rounded-xl border border-slate-800 bg-slate-950 p-4">
+                            <summary className="cursor-pointer text-sm font-semibold text-slate-300">
+                                Generator Settings
+                            </summary>
+
+                            <div className="mt-5 space-y-5">
+                                <div>
+                                    <div className="flex items-center justify-between">
+                                        <label
+                                            htmlFor="vaultPasswordLength"
+                                            className="text-sm font-medium text-slate-300"
+                                        >
+                                            Length
+                                        </label>
+
+                                        <span className="text-sm text-cyan-300">
+                                            {generatorOptions.length}
+                                        </span>
+                                    </div>
+
+                                    <input
+                                        id="vaultPasswordLength"
+                                        type="range"
+                                        min={8}
+                                        max={40}
+                                        value={generatorOptions.length}
+                                        onChange={(event) =>
+                                            updateGeneratorOption("length", Number(event.target.value))
+                                        }
+                                        className="mt-3 w-full"
+                                    />
+                                </div>
+
+                                <div className="grid gap-3 sm:grid-cols-2">
+                                    <label className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-900 p-4 text-sm text-slate-300">
+                                        <input
+                                            type="checkbox"
+                                            checked={generatorOptions.includeUppercase}
+                                            onChange={(event) =>
+                                                updateGeneratorOption("includeUppercase", event.target.checked)
+                                            }
+                                        />
+                                        Uppercase
+                                    </label>
+
+                                    <label className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-900 p-4 text-sm text-slate-300">
+                                        <input
+                                            type="checkbox"
+                                            checked={generatorOptions.includeLowercase}
+                                            onChange={(event) =>
+                                                updateGeneratorOption("includeLowercase", event.target.checked)
+                                            }
+                                        />
+                                        Lowercase
+                                    </label>
+
+                                    <label className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-900 p-4 text-sm text-slate-300">
+                                        <input
+                                            type="checkbox"
+                                            checked={generatorOptions.includeNumbers}
+                                            onChange={(event) =>
+                                                updateGeneratorOption("includeNumbers", event.target.checked)
+                                            }
+                                        />
+                                        Numbers
+                                    </label>
+
+                                    <label className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-900 p-4 text-sm text-slate-300">
+                                        <input
+                                            type="checkbox"
+                                            checked={generatorOptions.includeSymbols}
+                                            onChange={(event) =>
+                                                updateGeneratorOption("includeSymbols", event.target.checked)
+                                            }
+                                        />
+                                        Symbols
+                                    </label>
+                                </div>
+                            </div>
+                        </details>
                     </div>
 
                     <div>

@@ -30,6 +30,10 @@ const navItems = [
     href: "/security-center",
   },
   {
+    label: "Backup",
+    href: "/backup",
+  },
+  {
     label: "Audit Logs",
     href: "/audit-logs",
   },

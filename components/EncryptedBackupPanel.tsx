@@ -62,7 +62,12 @@ function getBackupFileName() {
   const date = new Date().toISOString().slice(0, 10);
   return `securevault-encrypted-backup-${date}.json`;
 }
-
+function getEncryptedItemFingerprint(item: {
+  encryptedData: string;
+  iv: string;
+}) {
+  return `${item.iv}:${item.encryptedData}`;
+}
 export default function EncryptedBackupPanel() {
   const { isVaultUnlocked } = useVault();
 
@@ -128,8 +133,7 @@ export default function EncryptedBackupPanel() {
       URL.revokeObjectURL(downloadUrl);
 
       setMessage(
-        `Encrypted backup exported successfully with ${vaultItems.length} item${
-          vaultItems.length === 1 ? "" : "s"
+        `Encrypted backup exported successfully with ${vaultItems.length} item${vaultItems.length === 1 ? "" : "s"
         }.`
       );
     } catch (error) {
@@ -180,10 +184,44 @@ export default function EncryptedBackupPanel() {
         return;
       }
 
+      const existingResponse = await fetch("/api/vault", {
+        method: "GET",
+        cache: "no-store",
+      });
+
+      const existingData = await existingResponse.json();
+
+      if (!existingResponse.ok || !existingData.ok) {
+        throw new Error(
+          existingData.message || "Failed to check existing vault items."
+        );
+      }
+
+      const existingVaultItems = existingData.items as ApiVaultItem[];
+
+      const existingFingerprints = new Set(
+        existingVaultItems.map((item) => getEncryptedItemFingerprint(item))
+      );
+
+      const newBackupItems = parsedBackup.items.filter((item) => {
+        return !existingFingerprints.has(getEncryptedItemFingerprint(item));
+      });
+
+      const skippedDuplicateCount =
+        parsedBackup.items.length - newBackupItems.length;
+
+      if (newBackupItems.length === 0) {
+        setMessage(
+          `Import skipped. All ${parsedBackup.items.length} item${parsedBackup.items.length === 1 ? "" : "s"
+          } already exist in your vault.`
+        );
+        return;
+      }
+
       const confirmed = window.confirm(
-        `Import ${parsedBackup.items.length} encrypted vault item${
-          parsedBackup.items.length === 1 ? "" : "s"
-        }? This will add new items to your vault and may create duplicates.`
+        `Import ${newBackupItems.length} new encrypted vault item${newBackupItems.length === 1 ? "" : "s"
+        }? ${skippedDuplicateCount} duplicate item${skippedDuplicateCount === 1 ? "" : "s"
+        } will be skipped.`
       );
 
       if (!confirmed) {
@@ -193,7 +231,7 @@ export default function EncryptedBackupPanel() {
       let importedCount = 0;
       let failedCount = 0;
 
-      for (const item of parsedBackup.items) {
+      for (const item of newBackupItems) {
         try {
           const response = await fetch("/api/vault", {
             method: "POST",
@@ -220,8 +258,8 @@ export default function EncryptedBackupPanel() {
       }
 
       setMessage(
-        `Import completed. Imported ${importedCount} item${
-          importedCount === 1 ? "" : "s"
+        `Import completed. Imported ${importedCount} item${importedCount === 1 ? "" : "s"
+        }, skipped ${skippedDuplicateCount} duplicate${skippedDuplicateCount === 1 ? "" : "s"
         }${failedCount > 0 ? `, failed ${failedCount}` : ""}.`
       );
     } catch (error) {
@@ -291,8 +329,8 @@ export default function EncryptedBackupPanel() {
           <h4 className="text-lg font-semibold">Import Encrypted Backup</h4>
 
           <p className="mt-2 text-sm leading-6 text-slate-400">
-            Imports encrypted vault records from a SecureVault backup file. This
-            adds new items and may create duplicates.
+            Imports encrypted vault records from a SecureVault backup file. Exact
+            encrypted duplicates are skipped automatically.
           </p>
 
           <input
@@ -318,15 +356,14 @@ export default function EncryptedBackupPanel() {
         <h4 className="font-semibold text-yellow-300">Important Limitation</h4>
 
         <p className="mt-2 text-sm leading-6 text-slate-300">
-          This V1 backup is encrypted and intended for the same SecureVault
-          account/master-password setup. If the backup was created with a
-          different encryption key, imported items may not decrypt correctly.
+          This encrypted backup is intended for the same SecureVault
+          account/master-password setup. If the backup was created with a different
+          encryption key, imported items may not decrypt correctly.
         </p>
 
         <p className="mt-2 text-sm leading-6 text-slate-300">
-          Do not edit the JSON file manually. Store it somewhere safe, because
-          losing access to your master password can make encrypted backups
-          unrecoverable.
+          Exact encrypted duplicates are skipped during import, but manually created
+          duplicate accounts may still need cleanup from Vault Maintenance.
         </p>
       </section>
     </div>

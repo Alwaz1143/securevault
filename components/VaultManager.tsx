@@ -15,6 +15,9 @@ import {
 } from "@/lib/passwordGenerator";
 import { evaluatePasswordStrength } from "@/lib/passwordStrength";
 
+import TotpCode from "@/components/TotpCode";
+import { normalizeTotpSecret, validateTotpSecret } from "@/lib/totp";
+
 type EncryptedVaultItem = {
     id: string;
     encryptedData: string;
@@ -30,6 +33,7 @@ type VaultFormState = {
     username: string;
     password: string;
     url: string;
+    totpSecret: string;
     notes: string;
     category: string;
 };
@@ -47,6 +51,7 @@ const emptyForm: VaultFormState = {
     username: "",
     password: "",
     url: "",
+    totpSecret: "",
     notes: "",
     category: "",
 };
@@ -130,6 +135,7 @@ export default function VaultManager() {
 
     const [formMessage, setFormMessage] = useState("");
     const [listMessage, setListMessage] = useState("");
+    const [totpSecretError, setTotpSecretError] = useState("");
     const [decryptWarning, setDecryptWarning] = useState("");
     const [visiblePasswords, setVisiblePasswords] = useState<
         Record<string, boolean>
@@ -231,6 +237,7 @@ export default function VaultManager() {
             setDecryptedItems({});
             setEditingId(null);
             setForm(emptyForm);
+            setTotpSecretError("");
             setError("");
             setFormMessage("");
             setListMessage("");
@@ -328,6 +335,10 @@ export default function VaultManager() {
             ...currentForm,
             [field]: value,
         }));
+
+        if (field === "totpSecret") {
+            setTotpSecretError("");
+        }
     }
 
     function updateGeneratorOption<K extends keyof PasswordGeneratorOptions>(
@@ -397,6 +408,7 @@ export default function VaultManager() {
             setError("");
             setFormMessage("");
             setListMessage("");
+            setTotpSecretError("");
 
             if (!isVaultUnlocked || !vaultKey) {
                 setError("Unlock the vault before saving items.");
@@ -410,6 +422,13 @@ export default function VaultManager() {
                 return;
             }
 
+            const totpValidation = validateTotpSecret(form.totpSecret);
+
+            if (!totpValidation.ok) {
+                setTotpSecretError(totpValidation.message);
+                return;
+            }
+
             setIsSaving(true);
 
             const plaintextItem: VaultPlaintextItem = {
@@ -417,6 +436,9 @@ export default function VaultManager() {
                 username: form.username.trim(),
                 password: form.password,
                 url: normalizeUrl(form.url),
+                totpSecret: form.totpSecret.trim()
+                    ? normalizeTotpSecret(form.totpSecret)
+                    : "",
                 notes: form.notes.trim(),
                 category: form.category.trim(),
             };
@@ -445,6 +467,7 @@ export default function VaultManager() {
 
             setEditingId(null);
             setForm(emptyForm);
+            setTotpSecretError("");
             setIsFormPasswordVisible(false);
             clearEditQueryParam();
 
@@ -477,6 +500,7 @@ export default function VaultManager() {
             username: item.username,
             password: item.password,
             url: item.url ?? "",
+            totpSecret: item.totpSecret ?? "",
             notes: item.notes ?? "",
             category: item.category ?? "",
         });
@@ -504,6 +528,7 @@ export default function VaultManager() {
         setError("");
         setFormMessage("");
         setListMessage("");
+        setTotpSecretError("");
     }
 
     async function handleDelete(itemId: string) {
@@ -806,6 +831,32 @@ export default function VaultManager() {
                         />
                     </div>
 
+                    <div className="md:col-span-2">
+                        <label className="text-sm font-medium text-slate-300">
+                            TOTP Secret / 2FA Setup Key
+                        </label>
+
+                        <input
+                            value={form.totpSecret}
+                            onChange={(event) => updateFormField("totpSecret", event.target.value)}
+                            placeholder="JBSWY3DPEHPK3PXP"
+                            className={`mt-2 w-full rounded-xl border bg-slate-950 px-4 py-3 font-mono text-slate-100 outline-none transition placeholder:text-slate-600 ${totpSecretError
+                                ? "border-red-400 focus:border-red-400"
+                                : "border-slate-700 focus:border-cyan-400"
+                                }`}
+                        />
+
+                        {totpSecretError && (
+                            <p className="mt-2 text-xs leading-5 text-red-300">{totpSecretError}</p>
+                        )}
+
+                        <p className="mt-2 text-xs leading-5 text-slate-500">
+                            Optional. Paste the setup key shown when enabling two-factor authentication on
+                            an account. This is different from the 6-digit code. Spaces and hyphens are
+                            allowed.
+                        </p>
+                    </div>
+
                     <div>
                         <label
                             htmlFor="category"
@@ -1045,6 +1096,11 @@ export default function VaultManager() {
                                                     {item.category}
                                                 </span>
                                             )}
+                                            {item.totpSecret && (
+                                                <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-300">
+                                                    2FA
+                                                </span>
+                                            )}
                                             {evaluatePasswordStrength(item.password).score <= 2 && (
                                                 <span className="rounded-full border border-yellow-500/30 bg-yellow-500/10 px-3 py-1 text-xs text-yellow-300">
                                                     Weak Password
@@ -1084,7 +1140,7 @@ export default function VaultManager() {
                                                 </a>
                                             </p>
                                         )}
-
+                                        {item.totpSecret && <TotpCode secret={item.totpSecret} />}
                                         {item.notes && (
                                             <p className="mt-3 text-sm leading-6 text-slate-500">
                                                 Notes: {item.notes}

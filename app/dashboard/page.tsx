@@ -1,6 +1,7 @@
 import DashboardOverview from "@/components/DashboardOverview";
 import DashboardShell from "@/components/DashboardShell";
 import MasterPasswordUnlock from "@/components/MasterPasswordUnlock";
+import DashboardSecuritySnapshot from "@/components/DashboardSecuritySnapshot";
 
 export default function DashboardPage() {
   return (
@@ -12,6 +13,7 @@ export default function DashboardPage() {
         <MasterPasswordUnlock />
 
         <DashboardOverview />
+        <DashboardSecuritySnapshot />
       </div>
     </DashboardShell>
   );

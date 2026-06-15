@@ -54,6 +54,7 @@ function getRiskTypeLabel(type: SecurityRisk["type"]) {
     weak_password: "Weak Password",
     reused_password: "Reused Password",
     old_password: "Old Password",
+    missing_2fa: "Missing 2FA",
     missing_url: "Missing URL",
     missing_category: "Missing Category",
   };
@@ -444,8 +445,8 @@ export default function SecurityCenterPanel() {
         {breachScanMessage && (
           <p
             className={`mt-4 text-sm ${report.breachedPasswordCount > 0
-                ? "text-red-300"
-                : "text-emerald-300"
+              ? "text-red-300"
+              : "text-emerald-300"
               }`}
           >
             {breachScanMessage}
@@ -482,7 +483,7 @@ export default function SecurityCenterPanel() {
 
           <p className="mt-3 text-xs leading-5 text-slate-500">
             Score is calculated locally using breach status, password strength,
-            reuse, age, URL completeness, and organization signals.
+            reuse, age, 2FA availability, URL completeness, and organization signals.
           </p>
         </div>
 
@@ -499,7 +500,7 @@ export default function SecurityCenterPanel() {
         />
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <StatCard
           label="Critical Risks"
           value={report.criticalCount}
@@ -519,6 +520,12 @@ export default function SecurityCenterPanel() {
         />
 
         <StatCard
+          label="Missing 2FA"
+          value={report.missing2faCount}
+          helper="Important accounts without TOTP setup keys."
+        />
+
+        <StatCard
           label="Missing URLs"
           value={report.missingUrlCount}
           helper="Items without a login page URL saved."
@@ -531,8 +538,8 @@ export default function SecurityCenterPanel() {
             <h3 className="text-xl font-semibold">Fix Priority</h3>
 
             <p className="mt-2 text-sm leading-6 text-slate-400">
-              Start with breached, reused, and weak passwords before improving
-              low-risk organization issues.
+              Start with breached, reused, weak, and missing-2FA issues before
+              improving low-risk organization problems.
             </p>
           </div>
 

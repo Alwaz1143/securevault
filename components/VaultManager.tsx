@@ -70,6 +70,51 @@ function normalizeUrl(url: string) {
     return `https://${trimmedUrl}`;
 }
 
+const HIGH_VALUE_2FA_KEYWORDS = [
+    "bank",
+    "banking",
+    "finance",
+    "financial",
+    "crypto",
+    "wallet",
+    "email",
+    "gmail",
+    "google",
+    "microsoft",
+    "outlook",
+    "icloud",
+    "github",
+    "gitlab",
+    "developer",
+    "cloud",
+    "aws",
+    "azure",
+    "vercel",
+    "work",
+    "office",
+    "admin",
+];
+
+function shouldSuggest2FA(item: VaultPlaintextItem) {
+    if (item.totpSecret?.trim()) {
+        return false;
+    }
+
+    const searchableText = [
+        item.title,
+        item.username,
+        item.url ?? "",
+        item.category ?? "",
+        item.notes ?? "",
+    ]
+        .join(" ")
+        .toLowerCase();
+
+    return HIGH_VALUE_2FA_KEYWORDS.some((keyword) =>
+        searchableText.includes(keyword)
+    );
+}
+
 function getEditItemIdFromUrl() {
     if (typeof window === "undefined") {
         return null;
@@ -1101,6 +1146,11 @@ export default function VaultManager() {
                                                     2FA
                                                 </span>
                                             )}
+                                            {shouldSuggest2FA(item) && (
+                                                <span className="rounded-full border border-orange-500/30 bg-orange-500/10 px-3 py-1 text-xs text-orange-300">
+                                                    Missing 2FA
+                                                </span>
+                                            )}
                                             {evaluatePasswordStrength(item.password).score <= 2 && (
                                                 <span className="rounded-full border border-yellow-500/30 bg-yellow-500/10 px-3 py-1 text-xs text-yellow-300">
                                                     Weak Password
@@ -1141,6 +1191,18 @@ export default function VaultManager() {
                                             </p>
                                         )}
                                         {item.totpSecret && <TotpCode secret={item.totpSecret} />}
+                                        {shouldSuggest2FA(item) && (
+                                            <div className="mt-4 rounded-2xl border border-orange-500/30 bg-orange-500/10 p-4">
+                                                <p className="text-sm font-semibold text-orange-300">
+                                                    2FA recommended
+                                                </p>
+
+                                                <p className="mt-2 text-sm leading-6 text-slate-300">
+                                                    This looks like an important account. Enable two-factor authentication on
+                                                    the account website, then save the TOTP setup key in SecureVault.
+                                                </p>
+                                            </div>
+                                        )}
                                         {item.notes && (
                                             <p className="mt-3 text-sm leading-6 text-slate-500">
                                                 Notes: {item.notes}

@@ -14,6 +14,7 @@ export type SecurityRiskType =
   | "weak_password"
   | "reused_password"
   | "old_password"
+  | "missing_2fa"
   | "missing_url"
   | "missing_category";
 
@@ -60,6 +61,7 @@ export type VaultSecurityReport = {
   weakPasswordCount: number;
   reusedPasswordCount: number;
   oldPasswordCount: number;
+  missing2faCount: number;
   missingUrlCount: number;
   missingCategoryCount: number;
   strongPasswordCount: number;
@@ -123,6 +125,77 @@ function buildRiskId(itemId: string, type: SecurityRiskType) {
   return `${type}_${itemId}`;
 }
 
+const HIGH_VALUE_ACCOUNT_KEYWORDS = [
+  "bank",
+  "banking",
+  "finance",
+  "financial",
+  "crypto",
+  "wallet",
+  "email",
+  "gmail",
+  "google",
+  "microsoft",
+  "outlook",
+  "icloud",
+  "github",
+  "gitlab",
+  "developer",
+  "cloud",
+  "aws",
+  "azure",
+  "vercel",
+  "work",
+  "office",
+  "admin",
+];
+
+function isHighValueAccount(item: VaultSecurityInputItem) {
+  const searchableText = [
+    item.title,
+    item.username,
+    item.url ?? "",
+    item.category ?? "",
+    item.notes ?? "",
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  return HIGH_VALUE_ACCOUNT_KEYWORDS.some((keyword) =>
+    searchableText.includes(keyword)
+  );
+}
+
+function getMissing2faSeverity(item: VaultSecurityInputItem): SecurityRiskSeverity {
+  const searchableText = [
+    item.title,
+    item.url ?? "",
+    item.category ?? "",
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  const criticalKeywords = [
+    "bank",
+    "banking",
+    "finance",
+    "financial",
+    "crypto",
+    "wallet",
+    "email",
+    "gmail",
+    "google",
+    "github",
+    "aws",
+    "azure",
+    "admin",
+  ];
+
+  return criticalKeywords.some((keyword) => searchableText.includes(keyword))
+    ? "high"
+    : "medium";
+}
+
 export function analyzeVaultSecurity(
   items: VaultSecurityInputItem[],
   breachStatusByItemId: BreachStatusMap = {}
@@ -133,6 +206,7 @@ export function analyzeVaultSecurity(
   let breachedPasswordCount = 0;
   let weakPasswordCount = 0;
   let oldPasswordCount = 0;
+  let missing2faCount = 0;
   let missingUrlCount = 0;
   let missingCategoryCount = 0;
   let strongPasswordCount = 0;
@@ -209,6 +283,24 @@ export function analyzeVaultSecurity(
         message: `${item.title} has not been updated for ${daysSinceUpdate} days.`,
         recommendation:
           "Review this account and consider rotating the password if it is important.",
+        updatedAt: item.updatedAt,
+      });
+    }
+
+    if (isHighValueAccount(item) && !item.totpSecret?.trim()) {
+      missing2faCount++;
+
+      risks.push({
+        id: buildRiskId(item.id, "missing_2fa"),
+        itemId: item.id,
+        title: item.title,
+        username: item.username,
+        url: item.url,
+        type: "missing_2fa",
+        severity: getMissing2faSeverity(item),
+        message: `${item.title} looks like an important account but does not have a 2FA setup key saved.`,
+        recommendation:
+          "Enable two-factor authentication on this account and store the TOTP setup key in SecureVault.",
         updatedAt: item.updatedAt,
       });
     }
@@ -315,6 +407,7 @@ export function analyzeVaultSecurity(
     weakPasswordCount,
     reusedPasswordCount,
     oldPasswordCount,
+    missing2faCount,
     missingUrlCount,
     missingCategoryCount,
     strongPasswordCount,

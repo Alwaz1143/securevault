@@ -65,6 +65,7 @@ const emptyForm: VaultFormState = {
     notes: "",
     category: "",
 };
+const SENSITIVE_VALUE_VISIBLE_MS = 15_000;
 
 function normalizeUrl(url: string) {
     const trimmedUrl = url.trim();
@@ -186,6 +187,7 @@ export default function VaultManager() {
     >({});
 
     const formRef = useRef<HTMLFormElement | null>(null);
+    const passwordVisibilityTimeoutsRef = useRef<Record<string, number>>({});
 
     const [form, setForm] = useState<VaultFormState>(emptyForm);
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -327,6 +329,12 @@ export default function VaultManager() {
 
     useEffect(() => {
         if (!isVaultUnlocked || !vaultKey) {
+            Object.values(passwordVisibilityTimeoutsRef.current).forEach((timeoutId) => {
+                window.clearTimeout(timeoutId);
+            });
+            passwordVisibilityTimeoutsRef.current = {};
+            setVisiblePasswords({});
+            setIsFormPasswordVisible(false);
             setEncryptedItems([]);
             setDecryptedItems({});
             setEditingId(null);
@@ -342,6 +350,28 @@ export default function VaultManager() {
         loadAndDecryptVaultItems();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isVaultUnlocked, vaultKey]);
+
+    useEffect(() => {
+        return () => {
+            Object.values(passwordVisibilityTimeoutsRef.current).forEach((timeoutId) => {
+                window.clearTimeout(timeoutId);
+            });
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!isFormPasswordVisible) {
+            return;
+        }
+
+        const timeoutId = window.setTimeout(() => {
+            setIsFormPasswordVisible(false);
+        }, SENSITIVE_VALUE_VISIBLE_MS);
+
+        return () => {
+            window.clearTimeout(timeoutId);
+        };
+    }, [isFormPasswordVisible, form.password]);
 
     useEffect(() => {
         if (!isVaultUnlocked) {
@@ -705,11 +735,44 @@ export default function VaultManager() {
         }
     }
 
+    function clearPasswordVisibilityTimeout(itemId: string) {
+        const existingTimeoutId = passwordVisibilityTimeoutsRef.current[itemId];
+
+        if (existingTimeoutId) {
+            window.clearTimeout(existingTimeoutId);
+            delete passwordVisibilityTimeoutsRef.current[itemId];
+        }
+    }
+
     function togglePasswordVisibility(itemId: string) {
+        const isCurrentlyVisible = Boolean(visiblePasswords[itemId]);
+
+        clearPasswordVisibilityTimeout(itemId);
+
+        if (isCurrentlyVisible) {
+            setVisiblePasswords((current) => ({
+                ...current,
+                [itemId]: false,
+            }));
+
+            return;
+        }
+
         setVisiblePasswords((current) => ({
             ...current,
-            [itemId]: !current[itemId],
+            [itemId]: true,
         }));
+
+        const timeoutId = window.setTimeout(() => {
+            setVisiblePasswords((current) => ({
+                ...current,
+                [itemId]: false,
+            }));
+
+            delete passwordVisibilityTimeoutsRef.current[itemId];
+        }, SENSITIVE_VALUE_VISIBLE_MS);
+
+        passwordVisibilityTimeoutsRef.current[itemId] = timeoutId;
     }
     function clearVaultFilters() {
         setSearchQuery("");
@@ -835,6 +898,12 @@ export default function VaultManager() {
                             placeholder="Account password"
                             className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-cyan-400"
                         />
+
+                        {isFormPasswordVisible && (
+                            <p className="mt-2 text-xs text-yellow-300">
+                                Password will auto-hide after 15 seconds.
+                            </p>
+                        )}
 
                         <div className="mt-3 rounded-xl border border-slate-800 bg-slate-950 p-4">
                             <div className="flex items-center justify-between gap-4">
@@ -1255,6 +1324,11 @@ export default function VaultManager() {
                                                     : "•".repeat(Math.min(item.password.length, 16))}
                                             </span>
                                         </p>
+                                        {isPasswordVisible && (
+                                            <p className="mt-1 text-xs text-yellow-300">
+                                                Password will auto-hide after 15 seconds.
+                                            </p>
+                                        )}
 
                                         {item.url && (
                                             <p className="mt-2 text-sm text-slate-400">

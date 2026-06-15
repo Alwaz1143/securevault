@@ -11,6 +11,8 @@ type TotpCodeProps = {
   secret: string;
 };
 
+import { copySensitiveTextToClipboard } from "@/lib/clipboard";
+
 export default function TotpCode({ secret }: TotpCodeProps) {
   const [currentSecond, setCurrentSecond] = useState(() =>
     Math.floor(Date.now() / 1000)
@@ -73,12 +75,15 @@ export default function TotpCode({ secret }: TotpCodeProps) {
         return;
       }
 
-      await navigator.clipboard.writeText(code);
-      setCopyMessage("2FA code copied.");
+      await copySensitiveTextToClipboard(code);
+
+      setCopyMessage(
+        "2FA code copied. SecureVault will try to auto-clear it in 30 seconds if your browser allows it."
+      );
 
       window.setTimeout(() => {
         setCopyMessage("");
-      }, 2000);
+      }, 3000);
     } catch {
       setError("Unable to copy 2FA code.");
     }

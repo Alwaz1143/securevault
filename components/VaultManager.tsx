@@ -18,6 +18,11 @@ import { evaluatePasswordStrength } from "@/lib/passwordStrength";
 import TotpCode from "@/components/TotpCode";
 import { normalizeTotpSecret, validateTotpSecret } from "@/lib/totp";
 
+import {
+    copySensitiveTextToClipboard,
+    copyTextToClipboard,
+} from "@/lib/clipboard";
+
 type EncryptedVaultItem = {
     id: string;
     encryptedData: string;
@@ -423,8 +428,11 @@ export default function VaultManager() {
                 return;
             }
 
-            await navigator.clipboard.writeText(form.password);
-            setFormMessage("Password copied to clipboard.");
+            await copySensitiveTextToClipboard(form.password);
+
+            setFormMessage(
+                "Password copied. SecureVault will try to auto-clear it in 30 seconds if your browser allows it."
+            );
         } catch {
             setError("Unable to copy password.");
         }
@@ -619,7 +627,19 @@ export default function VaultManager() {
 
     async function copyToClipboard(value: string, label: string) {
         try {
-            await navigator.clipboard.writeText(value);
+            const isSensitiveValue = label.toLowerCase().includes("password");
+
+            if (isSensitiveValue) {
+                await copySensitiveTextToClipboard(value);
+
+                setListMessage(
+                    `${label} copied. SecureVault will try to auto-clear it in 30 seconds if your browser allows it.`
+                );
+
+                return;
+            }
+
+            await copyTextToClipboard(value);
             setListMessage(`${label} copied to clipboard.`);
         } catch {
             setError("Unable to copy to clipboard.");

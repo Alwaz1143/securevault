@@ -51,6 +51,11 @@ type VaultSortOption =
 
 type VaultRiskFilter = "all" | "weak_passwords" | "missing_urls";
 
+type DuplicateVaultGroup = {
+    key: string;
+    items: DecryptedVaultListItem[];
+};
+
 const emptyForm: VaultFormState = {
     title: "",
     username: "",
@@ -73,6 +78,22 @@ function normalizeUrl(url: string) {
     }
 
     return `https://${trimmedUrl}`;
+}
+
+function getDuplicateKey(item: DecryptedVaultListItem) {
+    return [
+        item.title.trim().toLowerCase(),
+        item.username.trim().toLowerCase(),
+        item.url?.trim().toLowerCase() ?? "",
+    ].join("|");
+}
+
+function getDuplicateLabel(item: DecryptedVaultListItem) {
+    const title = item.title.trim() || "Untitled";
+    const username = item.username.trim() || "No username";
+    const url = item.url?.trim() || "No URL";
+
+    return `${title} • ${username} • ${url}`;
 }
 
 const HIGH_VALUE_2FA_KEYWORDS = [
@@ -276,6 +297,29 @@ export default function VaultManager() {
             );
         });
     }, [decryptedList, searchQuery, categoryFilter, riskFilter, sortOption]);
+
+    const duplicateGroups = useMemo<DuplicateVaultGroup[]>(() => {
+        const groups = new Map<string, DecryptedVaultListItem[]>();
+
+        for (const item of decryptedList) {
+            const duplicateKey = getDuplicateKey(item);
+            const currentGroup = groups.get(duplicateKey) ?? [];
+
+            currentGroup.push(item);
+            groups.set(duplicateKey, currentGroup);
+        }
+
+        return Array.from(groups.entries())
+            .filter(([, items]) => items.length > 1)
+            .map(([key, items]) => ({
+                key,
+                items: [...items].sort(
+                    (firstItem, secondItem) =>
+                        new Date(secondItem.updatedAt).getTime() -
+                        new Date(firstItem.updatedAt).getTime()
+                ),
+            }));
+    }, [decryptedList]);
 
     const formPasswordStrength = useMemo(() => {
         return evaluatePasswordStrength(form.password);
@@ -1313,6 +1357,115 @@ export default function VaultManager() {
                         );
                     })}
                 </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
+                <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+                    <div>
+                        <h3 className="text-xl font-semibold">Vault Maintenance</h3>
+
+                        <p className="mt-2 text-sm leading-6 text-slate-400">
+                            Detect possible duplicate vault items created by repeated saves,
+                            testing, or backup imports. Duplicate detection happens locally after
+                            decryption.
+                        </p>
+                    </div>
+
+                    <div className="rounded-full border border-slate-700 px-4 py-2 text-sm text-slate-300">
+                        {duplicateGroups.length} duplicate group
+                        {duplicateGroups.length === 1 ? "" : "s"}
+                    </div>
+                </div>
+
+                {duplicateGroups.length === 0 && (
+                    <div className="mt-6 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-5">
+                        <p className="font-semibold text-emerald-300">
+                            No duplicate vault items found.
+                        </p>
+
+                        <p className="mt-2 text-sm leading-6 text-slate-300">
+                            SecureVault did not find repeated items with the same title, username,
+                            and URL.
+                        </p>
+                    </div>
+                )}
+
+                {duplicateGroups.length > 0 && (
+                    <div className="mt-6 space-y-4">
+                        {duplicateGroups.map((group) => {
+                            const newestItem = group.items[0];
+                            const olderDuplicates = group.items.slice(1);
+
+                            return (
+                                <div
+                                    key={group.key}
+                                    className="rounded-2xl border border-slate-800 bg-slate-950 p-5"
+                                >
+                                    <div className="flex flex-col justify-between gap-3 md:flex-row md:items-start">
+                                        <div>
+                                            <p className="text-sm font-semibold text-yellow-300">
+                                                Possible Duplicate
+                                            </p>
+
+                                            <h4 className="mt-2 text-lg font-semibold text-slate-100">
+                                                {getDuplicateLabel(newestItem)}
+                                            </h4>
+
+                                            <p className="mt-2 text-sm text-slate-500">
+                                                {group.items.length} matching items found. Newest item is
+                                                listed first.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-5 space-y-3">
+                                        {group.items.map((item, index) => (
+                                            <div
+                                                key={item.id}
+                                                className="flex flex-col justify-between gap-3 rounded-xl border border-slate-800 bg-slate-900 p-4 sm:flex-row sm:items-center"
+                                            >
+                                                <div>
+                                                    <div className="flex flex-wrap items-center gap-2">
+                                                        <p className="font-medium text-slate-200">
+                                                            {index === 0 ? "Keep Recommended" : "Older Duplicate"}
+                                                        </p>
+
+                                                        {index === 0 && (
+                                                            <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-300">
+                                                                Newest
+                                                            </span>
+                                                        )}
+                                                    </div>
+
+                                                    <p className="mt-1 text-sm text-slate-500">
+                                                        Updated: {new Date(item.updatedAt).toLocaleString()}
+                                                    </p>
+                                                </div>
+
+                                                {index > 0 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleDelete(item.id)}
+                                                        className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:border-red-400 hover:text-red-300"
+                                                    >
+                                                        Delete Duplicate
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {olderDuplicates.length > 0 && (
+                                        <p className="mt-4 text-xs leading-5 text-slate-500">
+                                            Review before deleting. SecureVault recommends keeping the
+                                            newest matching item and deleting older duplicates.
+                                        </p>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
             </div>
         </div>
     );

@@ -528,10 +528,25 @@ export default function VaultManager() {
 
             setIsSaving(true);
 
+            const existingPlaintextItem = editingId ? decryptedItems[editingId] : null;
+            const existingEncryptedItem = editingId
+                ? encryptedItems.find((item) => item.id === editingId)
+                : null;
+
+            const isPasswordChanged =
+                !existingPlaintextItem || existingPlaintextItem.password !== form.password;
+
+            const passwordUpdatedAt = isPasswordChanged
+                ? new Date().toISOString()
+                : existingPlaintextItem.passwordUpdatedAt ??
+                existingEncryptedItem?.updatedAt ??
+                new Date().toISOString();
+
             const plaintextItem: VaultPlaintextItem = {
                 title: form.title.trim(),
                 username: form.username.trim(),
                 password: form.password,
+                passwordUpdatedAt,
                 url: normalizeUrl(form.url),
                 totpSecret: form.totpSecret.trim()
                     ? normalizeTotpSecret(form.totpSecret)
@@ -1274,7 +1289,12 @@ export default function VaultManager() {
                                         )}
 
                                         <p className="mt-4 text-xs text-slate-600">
-                                            Updated: {new Date(item.updatedAt).toLocaleString()}
+                                            Item updated: {new Date(item.updatedAt).toLocaleString()}
+                                        </p>
+
+                                        <p className="mt-1 text-xs text-slate-600">
+                                            Password updated:{" "}
+                                            {new Date(item.passwordUpdatedAt ?? item.updatedAt).toLocaleString()}
                                         </p>
                                     </div>
 
@@ -1437,8 +1457,13 @@ export default function VaultManager() {
                                                         )}
                                                     </div>
 
-                                                    <p className="mt-1 text-sm text-slate-500">
-                                                        Updated: {new Date(item.updatedAt).toLocaleString()}
+                                                    <p className="mt-4 text-xs text-slate-600">
+                                                        Item updated: {new Date(item.updatedAt).toLocaleString()}
+                                                    </p>
+
+                                                    <p className="mt-1 text-xs text-slate-600">
+                                                        Password updated:{" "}
+                                                        {new Date(item.passwordUpdatedAt ?? item.updatedAt).toLocaleString()}
                                                     </p>
                                                 </div>
 

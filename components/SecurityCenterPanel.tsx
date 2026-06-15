@@ -105,7 +105,7 @@ function RiskCard({ risk }: { risk: SecurityRisk }) {
         </div>
 
         <p className="text-xs text-slate-600">
-          Updated: {new Date(risk.updatedAt).toLocaleDateString()}
+          Reference date: {new Date(risk.updatedAt).toLocaleDateString()}
         </p>
       </div>
 

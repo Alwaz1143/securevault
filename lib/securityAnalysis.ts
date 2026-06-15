@@ -101,6 +101,10 @@ function getDaysSince(dateValue: string) {
   return Math.max(0, Math.floor(differenceMs / (1000 * 60 * 60 * 24)));
 }
 
+function getPasswordUpdatedAt(item: VaultSecurityInputItem) {
+  return item.passwordUpdatedAt ?? item.updatedAt;
+}
+
 function getScoreLabel(totalItems: number, score: number): SecurityScoreLabel {
   if (totalItems === 0) {
     return "No Data";
@@ -267,9 +271,10 @@ export function analyzeVaultSecurity(
       });
     }
 
-    const daysSinceUpdate = getDaysSince(item.updatedAt);
+    const passwordUpdatedAt = getPasswordUpdatedAt(item);
+    const daysSincePasswordUpdate = getDaysSince(passwordUpdatedAt);
 
-    if (daysSinceUpdate >= OLD_PASSWORD_DAYS) {
+    if (daysSincePasswordUpdate >= OLD_PASSWORD_DAYS) {
       oldPasswordCount++;
 
       risks.push({
@@ -280,10 +285,10 @@ export function analyzeVaultSecurity(
         url: item.url,
         type: "old_password",
         severity: "low",
-        message: `${item.title} has not been updated for ${daysSinceUpdate} days.`,
+        message: `${item.title} password has not been changed for ${daysSincePasswordUpdate} days.`,
         recommendation:
           "Review this account and consider rotating the password if it is important.",
-        updatedAt: item.updatedAt,
+        updatedAt: passwordUpdatedAt,
       });
     }
 

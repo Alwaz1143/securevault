@@ -81,6 +81,18 @@ function normalizeUrl(url: string) {
     return `https://${trimmedUrl}`;
 }
 
+function formatSyncTime(value: string) {
+    if (!value) {
+        return "Not synced yet";
+    }
+
+    return new Date(value).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+    });
+}
+
 function getDuplicateKey(item: DecryptedVaultListItem) {
     return [
         item.title.trim().toLowerCase(),
@@ -205,7 +217,8 @@ export default function VaultManager() {
     const [isLoading, setIsLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState("");
-
+    const [lastSyncedAt, setLastSyncedAt] = useState("");
+    const [isManualSyncing, setIsManualSyncing] = useState(false);
     const [formMessage, setFormMessage] = useState("");
     const [listMessage, setListMessage] = useState("");
     const [totpSecretError, setTotpSecretError] = useState("");
@@ -344,6 +357,8 @@ export default function VaultManager() {
             setFormMessage("");
             setListMessage("");
             setDecryptWarning("");
+            setLastSyncedAt("");
+            setIsManualSyncing(false);
             return;
         }
 
@@ -391,13 +406,56 @@ export default function VaultManager() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isVaultUnlocked, decryptedItems, editingId]);
 
-    async function loadAndDecryptVaultItems() {
+    useEffect(() => {
+        if (!isVaultUnlocked || !vaultKey) {
+            return;
+        }
+
+        let lastAutoSyncAt = 0;
+
+        async function syncOnFocus() {
+            const now = Date.now();
+
+            if (now - lastAutoSyncAt < 10_000) {
+                return;
+            }
+
+            if (document.visibilityState !== "visible") {
+                return;
+            }
+
+            lastAutoSyncAt = now;
+
+            try {
+                await loadAndDecryptVaultItems({ silent: true });
+            } catch (error) {
+                console.error("Auto-sync on focus failed:", error);
+            }
+        }
+
+        window.addEventListener("focus", syncOnFocus);
+        document.addEventListener("visibilitychange", syncOnFocus);
+
+        return () => {
+            window.removeEventListener("focus", syncOnFocus);
+            document.removeEventListener("visibilitychange", syncOnFocus);
+        };
+
+        // loadAndDecryptVaultItems is intentionally omitted to avoid re-registering listeners
+        // on every render.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isVaultUnlocked, vaultKey]);
+
+    async function loadAndDecryptVaultItems(options: { silent?: boolean } = {}) {
+        const { silent = false } = options;
         try {
-            setIsLoading(true);
-            setError("");
-            setFormMessage("");
-            setListMessage("");
-            setDecryptWarning("");
+            if (!silent) {
+                setIsLoading(true);
+                setError("");
+                setFormMessage("");
+                setListMessage("");
+                setDecryptWarning("");
+            }
 
             if (!vaultKey) {
                 setError("Vault key is missing. Lock and unlock the vault again.");
@@ -437,7 +495,7 @@ export default function VaultManager() {
 
             setEncryptedItems(encryptedVaultItems);
             setDecryptedItems(decryptedMap);
-
+            setLastSyncedAt(new Date().toISOString());
             if (failedDecryptCount > 0) {
                 setDecryptWarning(
                     `${failedDecryptCount} vault item(s) could not be decrypted. This usually means they were saved with a different master password or contain old invalid test data.`
@@ -446,11 +504,32 @@ export default function VaultManager() {
         } catch (error) {
             console.error("Failed to load/decrypt vault items:", error);
 
-            setError(
-                "Failed to load vault items. Please check your connection and try again."
-            );
+            if (!silent) {
+                setError(
+                    "Failed to load vault items. Please check your connection and try again."
+                );
+            }
         } finally {
-            setIsLoading(false);
+            if (!silent) {
+                setIsLoading(false);
+            }
+        }
+    }
+
+    async function syncVaultNow() {
+        try {
+            setIsManualSyncing(true);
+            setError("");
+            setListMessage("");
+
+            await loadAndDecryptVaultItems();
+
+            setListMessage("Vault synced with server.");
+        } catch (error) {
+            console.error("Manual vault sync failed:", error);
+            setError("Failed to sync vault.");
+        } finally {
+            setIsManualSyncing(false);
         }
     }
 
@@ -1108,23 +1187,35 @@ export default function VaultManager() {
             </form>
 
             <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
-                <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
                     <div>
                         <h3 className="text-xl font-semibold">Your Vault Items</h3>
-                        <p className="mt-2 text-sm text-slate-400">
-                            Items below are decrypted locally only while the vault is
-                            unlocked.
+
+                        <p className="mt-2 text-sm leading-6 text-slate-400">
+                            Search, filter, and manage your encrypted vault entries.
                         </p>
                     </div>
 
-                    <button
-                        onClick={loadAndDecryptVaultItems}
-                        disabled={isLoading}
-                        className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-300 transition hover:border-cyan-400 hover:text-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                        {isLoading ? "Refreshing..." : "Refresh"}
-                    </button>
+                    <div className="flex flex-col gap-2 sm:items-end">
+                        <p className="text-xs text-slate-500">
+                            Last synced:{" "}
+                            <span className="text-slate-300">{formatSyncTime(lastSyncedAt)}</span>
+                        </p>
+
+                        <button
+                            type="button"
+                            onClick={syncVaultNow}
+                            disabled={isLoading || isManualSyncing}
+                            className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-300 transition hover:border-cyan-400 hover:text-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            {isManualSyncing ? "Syncing..." : "Sync Now"}
+                        </button>
+                    </div>
                 </div>
+                <p className="mt-4 rounded-xl border border-slate-800 bg-slate-950 p-4 text-xs leading-5 text-slate-500">
+                    SecureVault syncs encrypted records through Neon. Changes from another device
+                    appear after refresh, manual sync, or when this tab becomes active again.
+                </p>
                 <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-950 p-4">
                     <div className="grid gap-4 lg:grid-cols-4">
                         <div className="lg:col-span-2">

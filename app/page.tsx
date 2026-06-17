@@ -1,10 +1,5 @@
 import Link from "next/link";
-import {
-  Show,
-  SignInButton,
-  SignUpButton,
-  UserButton,
-} from "@clerk/nextjs";
+import { Show, UserButton } from "@clerk/nextjs";
 
 export default function Home() {
   return (
@@ -16,17 +11,19 @@ export default function Home() {
 
         <div className="flex items-center gap-4">
           <Show when="signed-out">
-            <SignInButton mode="modal">
-              <button className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-cyan-400 hover:text-cyan-300">
-                Login
-              </button>
-            </SignInButton>
+            <Link
+              href="/sign-in"
+              className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-cyan-400 hover:text-cyan-300"
+            >
+              Login
+            </Link>
 
-            <SignUpButton mode="modal">
-              <button className="rounded-xl bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300">
-                Sign Up
-              </button>
-            </SignUpButton>
+            <Link
+              href="/sign-up"
+              className="rounded-xl bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
+            >
+              Sign Up
+            </Link>
           </Show>
 
           <Show when="signed-in">
@@ -36,6 +33,7 @@ export default function Home() {
             >
               Dashboard
             </Link>
+
             <UserButton />
           </Show>
         </div>
@@ -61,17 +59,19 @@ export default function Home() {
 
         <div className="mt-8 flex flex-col gap-4 sm:flex-row">
           <Show when="signed-out">
-            <SignInButton mode="modal">
-              <button className="rounded-xl bg-cyan-400 px-6 py-3 font-semibold text-slate-950 transition hover:bg-cyan-300">
-                Login
-              </button>
-            </SignInButton>
+            <Link
+              href="/sign-in"
+              className="rounded-xl bg-cyan-400 px-6 py-3 font-semibold text-slate-950 transition hover:bg-cyan-300"
+            >
+              Login
+            </Link>
 
-            <SignUpButton mode="modal">
-              <button className="rounded-xl border border-slate-700 px-6 py-3 font-semibold text-slate-200 transition hover:border-cyan-400 hover:text-cyan-300">
-                Sign Up
-              </button>
-            </SignUpButton>
+            <Link
+              href="/sign-up"
+              className="rounded-xl border border-slate-700 px-6 py-3 font-semibold text-slate-200 transition hover:border-cyan-400 hover:text-cyan-300"
+            >
+              Sign Up
+            </Link>
           </Show>
 
           <Show when="signed-in">
@@ -89,6 +89,7 @@ export default function Home() {
             <h2 className="font-semibold text-slate-100">
               Client-Side Encryption
             </h2>
+
             <p className="mt-2 text-sm text-slate-400">
               Vault data is encrypted in the browser before reaching the server.
             </p>
@@ -96,6 +97,7 @@ export default function Home() {
 
           <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
             <h2 className="font-semibold text-slate-100">Master Password</h2>
+
             <p className="mt-2 text-sm text-slate-400">
               The master password is used to unlock the vault, not for app
               login.
@@ -106,6 +108,7 @@ export default function Home() {
             <h2 className="font-semibold text-slate-100">
               Encrypted Storage
             </h2>
+
             <p className="mt-2 text-sm text-slate-400">
               The database stores ciphertext, IV, salt, and metadata only.
             </p>

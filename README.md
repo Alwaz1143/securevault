@@ -504,3 +504,4 @@ Known limitations:
 ## Disclaimer
 > SecureVault is a portfolio and learning project designed to demonstrate secure application architecture concepts. It should not be used as a real production password manager without professional security review, hardened deployment, and extensive testing.
 
+# Test

@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "SecureVault Autofill",
+  "description": "Detect login forms and prepare secure autofill for SecureVault.",
+  "version": "0.1.0",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "SecureVault Autofill"
+  },
+  "permissions": ["activeTab", "scripting"],
+  "background": {
+    "service_worker": "serviceWorker.js"
+  }
+}

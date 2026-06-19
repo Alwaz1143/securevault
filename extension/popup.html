@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SecureVault Autofill</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+
+  <body>
+    <main class="popup">
+      <header class="header">
+        <div>
+          <p class="eyebrow">SecureVault</p>
+          <h1>Autofill</h1>
+        </div>
+
+        <div class="status-dot" id="statusDot"></div>
+      </header>
+
+      <section class="card">
+        <p class="label">Current website</p>
+        <p class="value" id="currentUrl">Loading...</p>
+      </section>
+
+      <section class="card">
+        <p class="label">Detection result</p>
+        <h2 id="loginStatus">Checking page...</h2>
+        <p class="muted" id="summaryText">
+          SecureVault is scanning the current page for login fields.
+        </p>
+      </section>
+
+      <section class="grid">
+        <div class="metric">
+          <p class="metric-value" id="usernameCount">0</p>
+          <p class="metric-label">Username fields</p>
+        </div>
+
+        <div class="metric">
+          <p class="metric-value" id="passwordCount">0</p>
+          <p class="metric-label">Password fields</p>
+        </div>
+      </section>
+
+      <section class="card">
+        <p class="label">Details</p>
+        <pre id="detailsBox">Waiting for scan...</pre>
+      </section>
+
+      <button id="scanButton" type="button">Scan Again</button>
+
+      <p class="footer-note">
+        V1 only detects login fields. Autofill will be added after detection is
+        stable.
+      </p>
+    </main>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

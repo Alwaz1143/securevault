@@ -153,25 +153,77 @@
     };
   }
 
+  function setNativeInputValue(input, value) {
+    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+      window.HTMLInputElement.prototype,
+      "value"
+    )?.set;
+
+    if (nativeInputValueSetter) {
+      nativeInputValueSetter.call(input, value);
+    } else {
+      input.value = value;
+    }
+
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
+  function fillCredentials({ username, password }) {
+    const allInputs = Array.from(document.querySelectorAll("input"));
+    const visibleInputs = allInputs.filter(isVisibleElement);
+
+    const passwordField = visibleInputs.find(
+      (input) => getInputType(input) === "password"
+    );
+
+    const usernameField = visibleInputs.find(isUsernameCandidate);
+
+    let filledUsername = false;
+    let filledPassword = false;
+
+    if (usernameField && username) {
+      setNativeInputValue(usernameField, username);
+      usernameField.focus();
+      filledUsername = true;
+    }
+
+    if (passwordField && password) {
+      setNativeInputValue(passwordField, password);
+      filledPassword = true;
+    }
+
+    return { filledUsername, filledPassword };
+  }
+
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message?.type !== "SECUREVAULT_DETECT_LOGIN_FIELDS") {
-      return false;
+    if (message?.type === "SECUREVAULT_DETECT_LOGIN_FIELDS") {
+      try {
+        const result = detectLoginFields();
+        sendResponse({ ok: true, result });
+      } catch (error) {
+        sendResponse({
+          ok: false,
+          message: error instanceof Error ? error.message : "Detection failed."
+        });
+      }
+      return true;
     }
 
-    try {
-      const result = detectLoginFields();
-
-      sendResponse({
-        ok: true,
-        result
-      });
-    } catch (error) {
-      sendResponse({
-        ok: false,
-        message: error instanceof Error ? error.message : "Detection failed."
-      });
+    if (message?.type === "SECUREVAULT_FILL_CREDENTIALS") {
+      try {
+        const { username, password } = message.payload ?? {};
+        const result = fillCredentials({ username, password });
+        sendResponse({ ok: true, result });
+      } catch (error) {
+        sendResponse({
+          ok: false,
+          message: error instanceof Error ? error.message : "Fill failed."
+        });
+      }
+      return true;
     }
 
-    return true;
+    return false;
   });
 })();

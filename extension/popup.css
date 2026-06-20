@@ -176,3 +176,53 @@ button:disabled {
   line-height: 1.5;
   text-align: center;
 }
+
+/* ── Phase 2: Fill section ─────────────────────────────── */
+
+.fill-section {
+  margin-top: 12px;
+  padding: 14px;
+  border: 1px dashed #d97706;
+  border-radius: 16px;
+  background: #0f172a;
+}
+
+.fill-label {
+  margin: 0 0 4px;
+  color: #fbbf24;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.fill-hint {
+  margin: 0 0 12px;
+  color: #94a3b8;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.fill-btn {
+  background: #d97706;
+  color: #fff;
+}
+
+.fill-btn:hover {
+  background: #f59e0b;
+}
+
+.fill-status {
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  min-height: 16px;
+}
+
+.fill-status.success {
+  color: #34d399;
+}
+
+.fill-status.error {
+  color: #fb7185;
+}
